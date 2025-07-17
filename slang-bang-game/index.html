@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Slang and Bang - Mobile</title>
+    <link rel="stylesheet" href="css/main.css">
+</head>
+<body>
+    <div class="phone-container">
+        <!-- Status Bar -->
+        <div class="status-bar">
+            <div>🔐 Secure</div>
+            <div id="phoneTime">12:34</div>
+            <div>🔋 100%</div>
+        </div>
+
+        <!-- Header -->
+        <div class="header">
+            <div class="game-title">💊 SLANG AND BANG</div>
+            <div class="subtitle">Drug Empire Simulator</div>
+        </div>
+
+        <!-- Dynamic Screen Container -->
+        <div id="screenContainer" class="screen-container">
+            <!-- Screens will be dynamically loaded here -->
+        </div>
+
+        <!-- Navigation Bar -->
+        <div class="nav-bar">
+            <div class="nav-item active" data-screen="home">
+                <span>🏠</span>
+                <span>Home</span>
+            </div>
+            <div class="nav-item" data-screen="market">
+                <span>💊</span>
+                <span>Market</span>
+            </div>
+            <div class="nav-item" data-screen="travel">
+                <span>✈️</span>
+                <span>Travel</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Container -->
+    <div id="modalContainer"></div>
+
+    <!-- Load JavaScript Modules -->
+    <script type="module" src="js/main.js"></script>
+</body>
+</html>
