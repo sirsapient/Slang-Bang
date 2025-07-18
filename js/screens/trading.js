@@ -150,7 +150,11 @@ export class TradingScreen {
     
     buyDrug(drug) {
         const quantity = parseInt(document.getElementById(`buy-${drug}`)?.value) || 0;
-        
+        const supply = this.systems.trading.getCurrentCitySupply(drug);
+        if (quantity > supply) {
+            this.ui.modals.alert('Not enough for your order', 'Order Error');
+            return;
+        }
         if (this.systems.trading.buyDrug(drug, quantity)) {
             document.getElementById(`buy-${drug}`).value = '0';
             this.updateBuyCost(drug);

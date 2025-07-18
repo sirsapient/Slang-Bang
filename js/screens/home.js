@@ -70,9 +70,14 @@ export class HomeScreen {
                     <div class="app-name">Quick Buy</div>
                 </div>
                 
-                <div class="app-icon" onclick="game.screens.home.showBaseManagementModal()">
+                <div class="app-icon" onclick="game.showScreen('bases')">
                     <div class="app-emoji">🏢</div>
                     <div class="app-name">Manage Bases</div>
+                </div>
+                
+                <div class="app-icon" onclick="game.showScreen('raid')">
+                    <div class="app-emoji">⚔️</div>
+                    <div class="app-name">Raid Bases</div>
                 </div>
                 
                 <div class="app-icon" onclick="game.showScreen('market')">
@@ -98,6 +103,13 @@ export class HomeScreen {
                     <div class="app-emoji">🏆</div>
                     <div class="app-name">Ranking</div>
                 </div>
+                
+                <div class="app-icon" onclick="game.screens.home.showSettingsModal()">
+                    <div class="app-emoji">⚙️</div>
+                    <div class="app-name">Settings</div>
+                </div>
+                
+
             </div>
             
             <!-- Event Log -->
@@ -208,14 +220,21 @@ export class HomeScreen {
     quickBuyGuns() {
         const quantity = parseInt(document.getElementById('quickBuyGuns').value) || 0;
         const cost = quantity * this.game.data.config.gunCost;
-        
-        if (this.state.canAfford(cost)) {
-            this.state.updateCash(-cost);
-            this.state.set('guns', this.state.get('guns') + quantity);
-            this.ui.events.add(`Purchased ${quantity} guns for $${cost.toLocaleString()}`, 'good');
-            this.ui.modals.close();
-            this.refresh();
-        }
+        if (quantity <= 0) return;
+        const self = this;
+        this.ui.modals.confirm(
+            `Buy ${quantity} guns for $${cost.toLocaleString()}?`,
+            function() {
+                if (self.state.canAfford(cost)) {
+                    self.state.updateCash(-cost);
+                    self.state.set('guns', self.state.get('guns') + quantity);
+                    self.ui.events.add(`Purchased ${quantity} guns for $${cost.toLocaleString()}`, 'good');
+                    self.ui.modals.close();
+                    self.refresh();
+                }
+            },
+            null
+        );
     }
     
     quickBuyGang() {
@@ -223,24 +242,45 @@ export class HomeScreen {
         const costPer = this.calculateGangMemberCost();
         const cost = quantity * costPer;
         const heat = quantity * this.game.data.config.gangRecruitHeat;
-        
-        if (this.state.canAfford(cost)) {
-            this.state.updateCash(-cost);
-            this.state.updateGangSize(quantity);
-            this.state.updateWarrant(heat);
-            this.ui.events.add(`Recruited ${quantity} gang members for $${cost.toLocaleString()}`, 'good');
-            this.ui.events.add(`Gang recruitment increased heat by ${heat.toLocaleString()}`, 'bad');
-            this.ui.modals.close();
-            this.refresh();
-        }
+        if (quantity <= 0) return;
+        this.ui.modals.confirm(
+            `Recruit ${quantity} gang members for $${cost.toLocaleString()}?`,
+            () => {
+                console.log('Confirm callback called');
+                console.log('canAfford:', this.state.canAfford(cost), 'cost:', cost, 'cash:', this.state.get('cash'));
+                if (this.state.canAfford(cost)) {
+                    this.state.updateCash(-cost);
+                    this.state.updateGangSize(quantity);
+                    this.state.updateWarrant(heat);
+                    this.ui.events.add(`Recruited ${quantity} gang members for $${cost.toLocaleString()}`, 'good');
+                    this.ui.events.add(`Gang recruitment increased heat by ${heat.toLocaleString()}`, 'bad');
+                    this.ui.modals.close();
+                    // this.refresh(); // TEMPORARILY COMMENTED OUT FOR TESTING
+                    console.log('Purchase successful. New cash:', this.state.get('cash'), 'New gang size:', this.state.get('gangSize'));
+                } else {
+                    console.log('Purchase failed: not enough cash');
+                }
+            },
+            null
+        );
     }
     
     quickBuyBase() {
         const city = this.state.get('currentCity');
-        if (this.systems.bases.purchaseBase(city)) {
-            this.ui.modals.close();
-            this.refresh();
-        }
+        const baseCost = this.systems.bases.calculateBaseCost(city);
+        const self = this;
+        this.ui.modals.confirm(
+            `Purchase a base in ${city} for $${baseCost.toLocaleString()}?`,
+            function() {
+                if (self.systems.bases.purchaseBase(city)) {
+                    self.ui.modals.close();
+                    self.refresh();
+                } else {
+                    self.ui.modals.alert('Could not purchase base. You may already own a base here, lack enough cash, or need at least 4 gang members.', 'Purchase Failed');
+                }
+            },
+            null
+        );
     }
     
     calculateGangMemberCost() {
@@ -283,95 +323,6 @@ export class HomeScreen {
             this.ui.modals.close();
             this.refresh();
         }
-    }
-    
-    // Modal: Base Management
-    showBaseManagementModal() {
-        const summary = this.systems.bases.getBaseSummary();
-        const modal = this.ui.modals.create('🏢 Base Management', this.renderBaseManagementContent(summary));
-        modal.show();
-    }
-    
-    renderBaseManagementContent(summary) {
-        const bases = Object.values(this.state.data.bases);
-        
-        if (bases.length === 0) {
-            return `
-                <div style="text-align: center; padding: 30px;">
-                    <div style="font-size: 48px; margin-bottom: 15px;">🏠</div>
-                    <div style="font-size: 16px; color: #aaa;">No Bases Owned</div>
-                    <button onclick="game.ui.modals.close(); game.screens.home.showQuickBuyModal();" 
-                            class="action-btn" style="margin-top: 20px;">
-                        🛒 Quick Buy Base
-                    </button>
-                </div>
-            `;
-        }
-        
-        return `
-            <div style="background: #222; padding: 15px; margin-bottom: 20px; border-radius: 10px;">
-                <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; text-align: center;">
-                    <div>
-                        <div style="color: #aaa; font-size: 11px;">Bases</div>
-                        <div style="color: #ffff00; font-weight: bold;">${summary.basesOwned}</div>
-                    </div>
-                    <div>
-                        <div style="color: #aaa; font-size: 11px;">Daily Income</div>
-                        <div style="color: #66ff66; font-weight: bold;">$${summary.dailyIncome.toLocaleString()}</div>
-                    </div>
-                    <div>
-                        <div style="color: #aaa; font-size: 11px;">Cash Stored</div>
-                        <div style="color: #66ff66; font-weight: bold;">$${summary.totalCashStored.toLocaleString()}</div>
-                    </div>
-                </div>
-            </div>
-            
-            ${summary.totalCashStored > 0 ? `
-                <button onclick="game.systems.bases.collectAllBaseCash(); game.ui.modals.close(); game.screens.home.refresh();" 
-                        class="action-btn" style="width: 100%; margin-bottom: 15px;">
-                    💰 Collect All Cash ($${summary.totalCashStored.toLocaleString()})
-                </button>
-            ` : ''}
-            
-            <div style="max-height: 300px; overflow-y: auto;">
-                ${bases.map(base => this.renderBaseItem(base)).join('')}
-            </div>
-        `;
-    }
-    
-    renderBaseItem(base) {
-        const baseType = this.game.data.baseTypes[base.level];
-        const isCurrentCity = base.city === this.state.get('currentCity');
-        const income = this.systems.bases.calculateBaseIncome(base);
-        
-        return `
-            <div style="background: #222; border: 1px solid ${isCurrentCity ? '#66ff66' : '#444'}; 
-                        border-radius: 10px; padding: 15px; margin-bottom: 10px;">
-                <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
-                    <div>
-                        <div style="font-weight: bold;">${baseType.name}</div>
-                        <div style="font-size: 12px; color: #aaa;">${base.city} ${isCurrentCity ? '📍' : ''}</div>
-                    </div>
-                    <div style="text-align: right;">
-                        <div style="color: ${base.operational ? '#66ff66' : '#ff6666'}; font-size: 12px;">
-                            ${base.operational ? '✅ Active' : '❌ Inactive'}
-                        </div>
-                        <div style="font-size: 11px; color: #aaa;">$${income.toLocaleString()}/day</div>
-                    </div>
-                </div>
-                
-                ${isCurrentCity ? `
-                    <button onclick="game.ui.modals.close(); game.showScreen('bases');" 
-                            class="action-btn" style="width: 100%; font-size: 11px;">
-                        Manage Base
-                    </button>
-                ` : `
-                    <div style="text-align: center; font-size: 11px; color: #aaa;">
-                        Travel to ${base.city} to manage
-                    </div>
-                `}
-            </div>
-        `;
     }
     
     // Modal: Ranking
@@ -442,5 +393,36 @@ export class HomeScreen {
         }
         
         return currentRank;
+    }
+
+    showSettingsModal() {
+        const content = `
+            <div style="text-align: center; padding: 30px;">
+                <div style="font-size: 20px; font-weight: bold; margin-bottom: 20px;">Settings</div>
+                <button onclick="game.screens.home.confirmRestartGame()" class="action-btn" style="width: 100%; margin-bottom: 15px; background: #ff6666;">🔄 Restart Game</button>
+                <button onclick="game.ui.modals.close()" class="action-btn" style="width: 100%;">Close</button>
+            </div>
+        `;
+        const modal = this.ui.modals.create('⚙️ Settings', content);
+        modal.show();
+    }
+
+    confirmRestartGame() {
+        this.ui.modals.confirm(
+            'Are you sure you want to restart the game? This will erase your current progress.',
+            () => {
+                this.ui.modals.close();
+                this.confirmNewGame();
+            },
+            null
+        );
+    }
+
+    confirmNewGame() {
+        // Clear saved game and reload the page for a true fresh start
+        if (window.localStorage) {
+            localStorage.clear();
+        }
+        location.reload();
     }
 }

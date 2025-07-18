@@ -18,6 +18,8 @@ import { AssetSystem } from './systems/assets.js';
 import { AssetsScreen } from './screens/assets.js';
 import { assetData } from './data/assetsData.js';
 import { TradingScreen } from './screens/trading.js';
+import { RaidSystem } from './systems/raid.js';
+import { RaidScreen } from './screens/raid.js';
 Object.assign(gameData, assetData);
 
 class Game {
@@ -42,6 +44,7 @@ class Game {
         this.systems.trading = new TradingSystem(this.state, this.ui.events, this.data);
         this.systems.bases = new BaseSystem(this.state, this.ui.events, this.data);
         this.systems.assets = new AssetSystem(this.state, this.ui.events, assetData);
+        this.systems.raid = new RaidSystem(this.state, this.ui.events, this.data);
         
         // Initialize screens
         this.screens.home = new HomeScreen(this);
@@ -52,6 +55,7 @@ class Game {
         this.screens.bases = new BasesScreen(this);
         this.screens.assets = new AssetsScreen(this);
         this.screens.trading = new TradingScreen(this);
+        this.screens.raid = new RaidScreen(this);
         
         // Set up navigation
         this.setupNavigation();
@@ -137,12 +141,13 @@ class Game {
         if (this.state.countdownTimer) {
             clearInterval(this.state.countdownTimer);
         }
-        
+        if (this.state.baseSalesTimer) {
+            clearInterval(this.state.baseSalesTimer);
+        }
         // Start day advancement timer
         this.state.gameTimer = setInterval(() => {
             this.advanceDay();
         }, this.state.dayDuration);
-        
         // Start countdown timer
         this.state.countdownTimer = setInterval(() => {
             this.state.timeRemaining -= 1000;
@@ -151,7 +156,10 @@ class Game {
             }
             this.updateCountdown();
         }, 1000);
-        
+        // Start real-time base sales timer (every minute)
+        this.state.baseSalesTimer = setInterval(() => {
+            this.systems.bases.processRealTimeSales();
+        }, 60000);
         this.ui.events.add("⏰ Real-time mode activated - 60 seconds per day", 'neutral');
     }
     
@@ -162,8 +170,6 @@ class Game {
         
         // Apply daily systems
         this.systems.heat.applyWarrantDecay();
-        this.systems.heat.checkPoliceRaid();
-        this.systems.heat.generateGangHeat();
         this.systems.bases.generateDailyIncome();
         this.systems.trading.updateMarketPrices();
         
@@ -188,8 +194,9 @@ class Game {
 
 // Initialize game when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
-    window.game = new Game();
-    window.game.init().catch(error => {
+    const game = new Game();
+    window.game = game;
+    game.init().catch(error => {
         console.error('Failed to initialize game:', error);
         alert('Failed to initialize game. Please refresh the page.');
     });

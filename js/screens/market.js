@@ -41,10 +41,6 @@ export class MarketScreen {
             
             <div class="market-action-bar">
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 20px;">
-                    <button id="travelToMarketBtn" onclick="game.screens.market.travelToSelected()" 
-                            class="action-btn" style="padding: 15px;">
-                        ✈️ Travel There
-                    </button>
                     <button id="tradeAtMarketBtn" onclick="game.screens.market.goToTrading()" 
                             class="action-btn" style="padding: 15px;">
                         💰 Trade Here
@@ -85,7 +81,7 @@ export class MarketScreen {
                 <div>
                     ${isCurrentCity ? 
                         '<div style="background: #00ff00; color: #000; padding: 5px 10px; border-radius: 5px; font-size: 12px; font-weight: bold;">📍 Current</div>' : 
-                        `<div style="background: #ff6600; color: #fff; padding: 5px 10px; border-radius: 5px; font-size: 12px; font-weight: bold;">✈️ $${travelCost.toLocaleString()}</div>`
+                        `<div style="background: #ff6600; color: #fff; padding: 5px 10px; border-radius: 5px; font-size: 12px; font-weight: bold; cursor: pointer;" onclick=\"game.screens.market.confirmTravelToSelected()\">✈️ $${travelCost.toLocaleString()}</div>`
                     }
                 </div>
             </div>
@@ -184,5 +180,29 @@ export class MarketScreen {
     
     goToTrading() {
         this.game.showScreen('trading');
+    }
+
+    confirmTravelToSelected() {
+        const travelCost = this.systems.trading.calculateTravelCost(this.selectedCity);
+        const city = this.selectedCity;
+        const canAfford = this.state.canAfford(travelCost);
+        if (!canAfford) {
+            this.ui.modals.alert('Not enough cash to travel!', 'Travel Error');
+            return;
+        }
+        const confirmTravel = () => {
+            this.state.updateCash(-travelCost);
+            this.state.travelToCity(city);
+            // Apply heat reduction
+            this.systems.heat.applyTravelHeatReduction();
+            this.ui.events.add(`✈️ Arrived in ${city} (Cost: ${travelCost.toLocaleString()})`, 'good');
+            // Go to trading screen
+            this.game.showScreen('trading');
+        };
+        this.ui.modals.confirm(
+            `Travel to <b>${city}</b> for <b>$${travelCost.toLocaleString()}</b>?`,
+            confirmTravel,
+            null
+        );
     }
 }

@@ -63,6 +63,13 @@ export class HeatSystem {
     
     // Check for police raids based on heat level
     checkPoliceRaid() {
+        // Only trigger a raid if player has drugs in their personal inventory
+        const inventory = this.state.get('inventory');
+        const hasDrugs = Object.values(inventory).some(amount => amount > 0);
+        if (!hasDrugs) {
+            this.events.add('You have no drugs in your inventory. Police left you alone.', 'good');
+            return;
+        }
         const heat = this.calculateHeatLevel();
         
         if (heat >= 70) {
@@ -76,23 +83,26 @@ export class HeatSystem {
     
     // Execute a police raid
     executePoliceRaid() {
+        // Only raid if player has drugs in their personal inventory
+        const inventory = this.state.get('inventory');
+        const hasDrugs = Object.values(inventory).some(amount => amount > 0);
+        if (!hasDrugs) {
+            this.events.add('🚔 Police raided but found no drugs in your inventory. You were left alone.', 'good');
+            return;
+        }
         const totalDrugs = this.state.getTotalInventory();
         const guns = this.state.get('guns');
-        
         if (totalDrugs === 0 && guns === 0) {
             this.events.add('🚔 Police raided but found nothing! Lucky escape.', 'good');
             this.state.updateWarrant(-Math.floor(this.state.get('warrant') * 0.5));
             return;
         }
-        
         // Gun protection reduces losses
         const gunProtection = Math.min(0.4, guns * 0.02);
         const baseLossPercent = 0.3 + Math.random() * 0.4;
         const actualLossPercent = Math.max(0.1, baseLossPercent - gunProtection);
-        
         // Lose drugs
         const drugsLost = [];
-        const inventory = this.state.get('inventory');
         Object.keys(inventory).forEach(drug => {
             const currentAmount = inventory[drug];
             const lost = Math.floor(currentAmount * actualLossPercent);
@@ -101,25 +111,28 @@ export class HeatSystem {
                 drugsLost.push(`${lost} ${drug}`);
             }
         });
-        
-        // Lose cash
-        const cashLoss = Math.floor(this.state.get('cash') * (0.1 + Math.random() * 0.2));
-        this.state.updateCash(-cashLoss);
-        
+        // Lose cash (capped to 5% of cash in 24h)
+        const cash = this.state.get('cash');
+        const maxLoss24h = Math.floor(cash * 0.05);
+        const alreadyLost = this.state.getRaidLossLast24h ? this.state.getRaidLossLast24h() : 0;
+        let cashLoss = Math.floor(cash * (0.1 + Math.random() * 0.2));
+        let allowedLoss = Math.max(0, maxLoss24h - alreadyLost);
+        if (cashLoss > allowedLoss) cashLoss = allowedLoss;
+        if (cashLoss > 0) {
+            this.state.updateCash(-cashLoss);
+            if (this.state.addRaidLoss) this.state.addRaidLoss(cashLoss);
+        }
         // Lose guns
         const gunsLost = Math.floor(guns * (0.1 + Math.random() * 0.2));
         this.state.set('guns', Math.max(0, guns - gunsLost));
-        
         // Increase warrant
         const warrantIncrease = 5000 + Math.floor(Math.random() * 10000);
         this.state.updateWarrant(warrantIncrease);
-
         // Asset protection event
         const assetValue = window.game?.systems?.assets?.getTotalAssetValue() || 0;
         if (assetValue > 0) {
             this.events.add('💎 Your assets were protected from the raid!', 'good');
         }
-
         // Build raid message
         let raidMessage = `🚔 POLICE RAID! Lost `;
         if (drugsLost.length > 0) {
@@ -130,19 +143,22 @@ export class HeatSystem {
             raidMessage += `, ${gunsLost} guns`;
         }
         raidMessage += `, +${warrantIncrease.toLocaleString()} warrant`;
-        
         if (gunProtection > 0) {
             this.events.add(`🔫 Guns reduced raid losses by ${Math.floor(gunProtection * 100)}%`, 'good');
         }
-        
+        if (cashLoss === 0) {
+            raidMessage += ' (cash loss capped for 24h)';
+        }
         this.events.add(raidMessage, 'bad');
     }
     
     // Generate heat from gang activities
     generateGangHeat() {
+        // Only generate heat if player has drugs in their personal inventory (not bases)
         const gangSize = this.state.get('gangSize');
-        
-        if (gangSize > 0) {
+        const inventory = this.state.get('inventory');
+        const hasDrugs = Object.values(inventory).some(amount => amount > 0);
+        if (gangSize > 0 && hasDrugs) {
             const warrantIncrease = Math.floor(gangSize * 100 * Math.random());
             if (warrantIncrease > 0) {
                 this.state.updateWarrant(warrantIncrease);

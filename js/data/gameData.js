@@ -97,8 +97,8 @@ export const gameData = {
             income: 1000, 
             gangRequired: 4, 
             upgradeCost: 15000, 
-            maxInventory: 50, 
-            maxSafe: 100000 
+            maxInventory: 60, // 10 per drug, 6 drugs
+            maxSafe: 50000 
         },
         2: { 
             name: 'Safe House', 
@@ -106,7 +106,7 @@ export const gameData = {
             income: 2500, 
             gangRequired: 6, 
             upgradeCost: 40000, 
-            maxInventory: 100, 
+            maxInventory: 120, // 20 per drug
             maxSafe: 250000 
         },
         3: { 
@@ -115,7 +115,7 @@ export const gameData = {
             income: 6000, 
             gangRequired: 10, 
             upgradeCost: 100000, 
-            maxInventory: 200, 
+            maxInventory: 240, // 40 per drug
             maxSafe: 500000 
         },
         4: { 
@@ -124,7 +124,7 @@ export const gameData = {
             income: 15000, 
             gangRequired: 15, 
             upgradeCost: null, 
-            maxInventory: 500, 
+            maxInventory: 480, // 80 per drug
             maxSafe: 1000000 
         }
     },

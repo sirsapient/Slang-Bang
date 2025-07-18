@@ -511,10 +511,6 @@ button:disabled {
     justify-content: center;
     opacity: 0;
     transition: opacity 0.3s;
-    pointer-events: none;
-}
-
-.modal-overlay[style*='opacity: 1'] {
     pointer-events: auto;
 }
 
@@ -564,4 +560,49 @@ button:disabled {
     padding-bottom: 20px;
     box-shadow: 0 -2px 12px rgba(0,0,0,0.3);
     margin-bottom: 70px;
+}
+
+/* Raid System Styles */
+.raid-target {
+    background: linear-gradient(135deg, #330000, #440000);
+    border: 2px solid #ff6666;
+}
+
+.raid-success-high {
+    color: #66ff66;
+}
+
+.raid-success-medium {
+    color: #ffff00;
+}
+
+.raid-success-low {
+    color: #ff6666;
+}
+
+input[type="range"] {
+    width: 100%;
+    height: 8px;
+    background: #333;
+    border-radius: 4px;
+    outline: none;
+    -webkit-appearance: none;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    background: #ff6600;
+    cursor: pointer;
+    border-radius: 50%;
+}
+
+input[type="range"]::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    background: #ff6600;
+    cursor: pointer;
+    border-radius: 50%;
 }

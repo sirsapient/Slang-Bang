@@ -285,14 +285,16 @@ export class BasesScreen {
     
     travelToBase(city) {
         const cost = this.systems.trading.calculateTravelCost(city);
-        
-        if (confirm(`Travel to ${city} for $${cost.toLocaleString()} to manage your base?`)) {
-            this.state.updateCash(-cost);
-            this.state.travelToCity(city);
-            this.systems.heat.applyTravelHeatReduction();
-            this.ui.events.add(`✈️ Arrived in ${city} (Cost: $${cost.toLocaleString()})`, 'good');
-            this.game.showScreen('bases');
-        }
+        this.ui.modals.confirm(
+            `Travel to ${city} for $${cost.toLocaleString()} to manage your base?`,
+            () => {
+                this.state.updateCash(-cost);
+                this.state.travelToCity(city);
+                this.systems.heat.applyTravelHeatReduction();
+                this.ui.events.add(`✈️ Arrived in ${city} (Cost: $${cost.toLocaleString()})`, 'good');
+                this.game.showScreen('bases');
+            }
+        );
     }
     
     showBaseManagementModal(city) {
@@ -305,15 +307,24 @@ export class BasesScreen {
     
     renderBaseManagementModal(base) {
         const baseType = this.game.data.baseTypes[base.level];
-        
         // Initialize base inventory if it doesn't exist
         if (!base.inventory) {
             base.inventory = this.systems.bases.createEmptyInventory();
         }
-        
         const drugCount = this.systems.bases.getBaseDrugCount(base);
-        
+        const income = this.systems.bases.calculateBaseIncome(base);
         return `
+            <div style="background: #222; border-radius: 10px; padding: 15px; margin-bottom: 15px;">
+                <div style="font-weight: bold; color: #fff; font-size: 16px; margin-bottom: 8px;">
+                    ${baseType.name} - ${base.city}
+                </div>
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; text-align: center; font-size: 12px; color: #aaa; margin-bottom: 8px;">
+                    <div>👥 Gang: <span style='color:#ffff00;'>${base.assignedGang}/${baseType.gangRequired}</span></div>
+                    <div>💰 Daily Income: <span style='color:#66ff66;'>$${income.toLocaleString()}</span></div>
+                    <div>📦 Drugs: <span style='color:#66ff66;'>${drugCount}/${baseType.maxInventory}</span></div>
+                    <div>💵 Cash: <span style='color:#66ff66;'>$${base.cashStored.toLocaleString()}</span></div>
+                </div>
+            </div>
             <div style="text-align: center; margin-bottom: 20px; padding: 10px; 
                         background: ${base.operational ? '#002200' : '#220000'}; border-radius: 5px;">
                 <strong style="color: ${base.operational ? '#00ff00' : '#ff0000'};">
@@ -321,24 +332,10 @@ export class BasesScreen {
                 </strong>
                 <div style="font-size: 12px; color: #aaa; margin-top: 5px;">
                     ${base.operational ? 
-                        `Daily Earnings: $${this.systems.bases.calculateBaseIncome(base).toLocaleString()}` : 
+                        `Daily Earnings: $${income.toLocaleString()}` : 
                         'Needs gang members and drugs to operate'}
                 </div>
             </div>
-            
-            <!-- Base Defense -->
-            <div style="background: #222; padding: 15px; border-radius: 5px; margin-bottom: 15px;">
-                <h4 style="color: #ff0000; margin-top: 0;">🔫 Base Defense</h4>
-                <div>Guns: <span style="color: #ffff00;">${base.guns || 0}</span></div>
-                <div style="margin-top: 10px;">
-                    <button onclick="game.screens.bases.buyGunsForBase('${base.city}')" 
-                            class="action-btn" style="width: 100%;"
-                            ${this.state.get('cash') < this.game.data.config.gunCost ? 'disabled' : ''}>
-                        Buy Guns ($${this.game.data.config.gunCost.toLocaleString()})
-                    </button>
-                </div>
-            </div>
-            
             <!-- Drug Storage -->
             <div style="background: #222; padding: 15px; border-radius: 5px;">
                 <h4 style="color: #66ff66; margin-top: 0;">
@@ -370,26 +367,19 @@ export class BasesScreen {
             </div>
         `;
     }
-    
-    buyGunsForBase(city) {
-        if (this.systems.bases.buyGunsForBase(city, 1)) {
-            this.ui.modals.close();
-            this.showBaseManagementModal(city);
-        }
-    }
-    
+
     storeDrug(city, drug) {
         if (this.systems.bases.storeDrugsInBase(city, drug, 1)) {
             this.ui.modals.close();
-            this.showBaseManagementModal(city);
+            setTimeout(() => this.showBaseManagementModal(city), 350);
             this.game.showScreen('bases'); // Refresh main screen
         }
     }
-    
+
     takeDrug(city, drug) {
         if (this.systems.bases.takeDrugsFromBase(city, drug, 1)) {
             this.ui.modals.close();
-            this.showBaseManagementModal(city);
+            setTimeout(() => this.showBaseManagementModal(city), 350);
             this.game.showScreen('bases'); // Refresh main screen
         }
     }

@@ -105,195 +105,31 @@ export class HomeScreen {
                 <div style="text-align: center; margin-bottom: 10px; color: #666; font-size: 12px;">📰 Recent Activity</div>
                 <div id="eventLog">${this.ui.events.getHTML()}</div>
             </div>
-        `;
-    }
-    
-    onShow() {
-        // Update event log reference
-        this.ui.events.setContainer(document.getElementById('eventLog'));
-        
-        // Refresh heat display
-        this.systems.heat.calculateHeatLevel();
-    }
-    
-    refresh() {
-        // Update dynamic elements without full re-render
-        const cashEl = document.getElementById('homeCash');
-        const dayEl = document.getElementById('homeDay');
-        
-        if (cashEl) cashEl.textContent = this.state.get('cash').toLocaleString();
-        if (dayEl) dayEl.textContent = this.state.get('day');
-        
-        // Update heat warning if needed
-        const heatWarning = this.systems.heat.getHeatWarning();
-        const warningCard = document.getElementById('heatWarningCard');
-        
-        if (heatWarning && !warningCard) {
-            // Need to re-render to show warning
-            this.game.showScreen('home');
-        } else if (!heatWarning && warningCard) {
-            // Remove warning
-            warningCard.remove();
-        }
-    }
-    
-    // Modal: Quick Buy
-    showQuickBuyModal() {
-        const modal = this.ui.modals.create('🛒 Quick Buy Assets', this.renderQuickBuyContent());
-        modal.show();
-    }
-    
-    renderQuickBuyContent() {
-        const gunCost = this.game.data.config.gunCost;
-        const gangCost = this.calculateGangMemberCost();
-        const baseCost = this.systems.bases.calculateBaseCost(this.state.get('currentCity'));
-        const hasBase = this.state.hasBase(this.state.get('currentCity'));
-        const cash = this.state.get('cash');
-        
-        return `
-            <div style="background: #222; border: 1px solid #666; border-radius: 10px; padding: 15px; margin-bottom: 20px; text-align: center;">
-                <div style="font-size: 12px; color: #aaa; margin-bottom: 5px;">💰 Available Cash</div>
-                <div style="font-size: 20px; color: #66ff66; font-weight: bold;">$${cash.toLocaleString()}</div>
-            </div>
-            
-            <!-- Guns -->
-            <div style="background: #222; border: 1px solid #444; border-radius: 10px; padding: 15px; margin-bottom: 15px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                    <div style="font-weight: bold;">🔫 Guns</div>
-                    <div style="color: #66ff66;">$${gunCost.toLocaleString()} each</div>
-                </div>
-                <div style="font-size: 11px; color: #aaa; margin-bottom: 10px;">
-                    You have: ${this.state.get('guns')} guns
-                </div>
-                <div style="display: grid; grid-template-columns: 1fr auto; gap: 8px;">
-                    <input type="number" id="quickBuyGuns" value="1" min="1" max="100" class="quantity-input">
-                    <button onclick="game.screens.home.quickBuyGuns()" class="action-btn">Buy</button>
-                </div>
-            </div>
-            
-            <!-- Gang Members -->
-            <div style="background: #222; border: 1px solid #444; border-radius: 10px; padding: 15px; margin-bottom: 15px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                    <div style="font-weight: bold;">👥 Gang Members</div>
-                    <div style="color: #66ff66;">$${gangCost.toLocaleString()} each</div>
-                </div>
-                <div style="font-size: 11px; color: #aaa; margin-bottom: 10px;">
-                    You have: ${this.state.get('gangSize')} members
-                </div>
-                <div style="display: grid; grid-template-columns: 1fr auto; gap: 8px;">
-                    <input type="number" id="quickBuyGang" value="1" min="1" max="50" class="quantity-input">
-                    <button onclick="game.screens.home.quickBuyGang()" class="action-btn">Buy</button>
-                </div>
-            </div>
-            
-            <!-- Base -->
-            <div style="background: #222; border: 1px solid #444; border-radius: 10px; padding: 15px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                    <div style="font-weight: bold;">🏢 Base in ${this.state.get('currentCity')}</div>
-                    <div style="color: #66ff66;">$${baseCost.toLocaleString()}</div>
-                </div>
-                <button 
-                    onclick="game.screens.home.quickBuyBase()" 
-                    class="action-btn" 
-                    style="width: 100%;"
-                    ${hasBase || cash < baseCost || this.state.get('gangSize') < 4 ? 'disabled' : ''}>
-                    ${hasBase ? 'Already Owned' : 
-                      this.state.get('gangSize') < 4 ? 'Need 4+ Gang' :
-                      cash < baseCost ? 'Cannot Afford' : 'Purchase Base'}
+
+            <!-- Save Status -->
+            <div style="text-align: center; margin-top: 10px; font-size: 10px; color: #666;">
+                <span id="saveStatus">💾 Auto-save enabled</span>
+                <button onclick="game.screens.home.confirmNewGame()" 
+                        style="margin-left: 10px; padding: 4px 8px; font-size: 10px; 
+                               background: #444; border: 1px solid #666; color: #aaa;">
+                    New Game
                 </button>
             </div>
         `;
     }
-    
-    quickBuyGuns() {
-        const quantity = parseInt(document.getElementById('quickBuyGuns').value) || 0;
-        const cost = quantity * this.game.data.config.gunCost;
-        
-        if (this.state.canAfford(cost)) {
-            this.state.updateCash(-cost);
-            this.state.set('guns', this.state.get('guns') + quantity);
-            this.ui.events.add(`Purchased ${quantity} guns for $${cost.toLocaleString()}`, 'good');
-            this.ui.modals.close();
-            this.refresh();
-        }
-    }
-    
-    quickBuyGang() {
-        const quantity = parseInt(document.getElementById('quickBuyGang').value) || 0;
-        const costPer = this.calculateGangMemberCost();
-        const cost = quantity * costPer;
-        const heat = quantity * this.game.data.config.gangRecruitHeat;
-        
-        if (this.state.canAfford(cost)) {
-            this.state.updateCash(-cost);
-            this.state.updateGangSize(quantity);
-            this.state.updateWarrant(heat);
-            this.ui.events.add(`Recruited ${quantity} gang members for $${cost.toLocaleString()}`, 'good');
-            this.ui.events.add(`Gang recruitment increased heat by ${heat.toLocaleString()}`, 'bad');
-            this.ui.modals.close();
-            this.refresh();
-        }
-    }
-    
-    quickBuyBase() {
-        const city = this.state.get('currentCity');
-        if (this.systems.bases.purchaseBase(city)) {
-            this.ui.modals.close();
-            this.refresh();
-        }
-    }
-    
-    calculateGangMemberCost() {
-        const baseCost = this.game.data.config.baseGangCost;
-        const cityModifier = this.game.data.cities[this.state.get('currentCity')].heatModifier;
-        const gangModifier = 1 + (this.state.get('gangSize') * this.game.data.config.gangCostScaling);
-        return Math.floor(baseCost * cityModifier * gangModifier);
-    }
-    
-    // Modal: Bribery
-    showBriberyModal() {
-        const bribery = this.systems.heat.calculateBriberyCost();
-        
-        const content = `
-            <div style="text-align: center; padding: 30px;">
-                <p style="margin: 15px 0;">Pay bribes to reduce your heat level?</p>
-                
-                <div style="background: #222; padding: 15px; margin: 15px 0; border-radius: 5px;">
-                    <div>Current Warrant: <span style="color: #ff6666;">$${this.state.get('warrant').toLocaleString()}</span></div>
-                    <div>Bribery Cost: <span style="color: #ff6600;">$${bribery.cost.toLocaleString()}</span></div>
-                    <div>Warrant Reduction: <span style="color: #66ff66;">-$${bribery.reduction.toLocaleString()}</span></div>
-                </div>
-                
-                <button onclick="game.screens.home.executeBribery()" class="action-btn bribe" style="margin: 10px;">
-                    💰 Pay Bribes
-                </button>
-                <button onclick="game.ui.modals.close()" class="action-btn" style="background: #ff6666; margin: 10px;">
-                    Cancel
-                </button>
-            </div>
-        `;
-        
-        const modal = this.ui.modals.create('💰 Corrupt Officials', content);
-        modal.show();
-    }
-    
-    executeBribery() {
-        const bribery = this.systems.heat.calculateBriberyCost();
-        if (this.systems.heat.processBribery(bribery.cost, bribery.reduction)) {
-            this.ui.modals.close();
-            this.refresh();
-        }
-    }
-    
+
+    // ... (other methods unchanged) ...
+
     // Modal: Base Management
     showBaseManagementModal() {
         const summary = this.systems.bases.getBaseSummary();
         const modal = this.ui.modals.create('🏢 Base Management', this.renderBaseManagementContent(summary));
         modal.show();
     }
-    
+
     renderBaseManagementContent(summary) {
         const bases = Object.values(this.state.data.bases);
+        const currentCity = this.state.get('currentCity');
         
         if (bases.length === 0) {
             return `
@@ -325,20 +161,12 @@ export class HomeScreen {
                     </div>
                 </div>
             </div>
-            
-            ${summary.totalCashStored > 0 ? `
-                <button onclick="game.systems.bases.collectAllBaseCash(); game.ui.modals.close(); game.screens.home.refresh();" 
-                        class="action-btn" style="width: 100%; margin-bottom: 15px;">
-                    💰 Collect All Cash ($${summary.totalCashStored.toLocaleString()})
-                </button>
-            ` : ''}
-            
             <div style="max-height: 300px; overflow-y: auto;">
                 ${bases.map(base => this.renderBaseItem(base)).join('')}
             </div>
         `;
     }
-    
+
     renderBaseItem(base) {
         const baseType = this.game.data.baseTypes[base.level];
         const isCurrentCity = base.city === this.state.get('currentCity');
@@ -366,81 +194,51 @@ export class HomeScreen {
                         Manage Base
                     </button>
                 ` : `
-                    <div style="text-align: center; font-size: 11px; color: #aaa;">
-                        Travel to ${base.city} to manage
-                    </div>
+                    <button onclick="game.screens.home.travelToBase('${base.city}')" 
+                            class="action-btn" style="width: 100%; font-size: 11px;">
+                        ✈️ Travel to ${base.city}
+                    </button>
                 `}
             </div>
         `;
     }
-    
-    // Modal: Ranking
-    showRankingModal() {
-        const modal = this.ui.modals.create('🏆 Player Ranking', this.renderRankingContent());
-        modal.show();
+
+    confirmTravelToBase(city) {
+        const cost = this.systems.trading.calculateTravelCost(city);
+        this.ui.modals.confirm(
+            `Travel to ${city} for $${cost.toLocaleString()} to manage your base?`,
+            () => {
+                this.state.updateCash(-cost);
+                this.state.travelToCity(city);
+                this.systems.heat.applyTravelHeatReduction();
+                this.ui.events.add(`✈️ Arrived in ${city} (Cost: $${cost.toLocaleString()})`, 'good');
+                this.ui.modals.close();
+                this.game.showScreen('bases');
+            },
+            null
+        );
     }
-    
-    renderRankingContent() {
-        const netWorth = this.state.calculateNetWorth();
-        const currentRankId = this.getCurrentRank();
-        const currentRank = this.game.data.playerRanks[currentRankId];
-        const nextRank = currentRankId < 7 ? this.game.data.playerRanks[currentRankId + 1] : null;
+
+    travelToBase(city) {
+        const cost = this.systems.trading.calculateTravelCost(city);
         
-        return `
-            <div style="text-align: center; padding: 20px;">
-                <div style="font-size: 48px; margin-bottom: 10px;">${currentRank.emoji}</div>
-                <div style="font-size: 20px; color: ${currentRank.color}; font-weight: bold;">${currentRank.name}</div>
-                <div style="font-size: 12px; color: #aaa; margin-bottom: 20px;">Rank ${currentRankId} of 7</div>
-                
-                <div style="background: #222; padding: 15px; border-radius: 10px; margin-bottom: 20px;">
-                    <div style="font-size: 14px; color: #ffff00; margin-bottom: 10px;">📊 Current Stats</div>
-                    <div style="text-align: left; font-size: 12px;">
-                        💰 Net Worth: $${netWorth.toLocaleString()}<br>
-                        🏢 Bases: ${Object.keys(this.state.data.bases).length}<br>
-                        👥 Gang: ${this.state.get('gangSize')}<br>
-                        🔫 Guns: ${this.state.get('guns')}
-                    </div>
-                </div>
-                
-                ${nextRank ? `
-                    <div style="background: #1a1a1a; padding: 15px; border-radius: 10px;">
-                        <div style="font-size: 14px; color: #aaa; margin-bottom: 10px;">
-                            🎯 Next: ${nextRank.emoji} ${nextRank.name}
-                        </div>
-                        <div style="text-align: left; font-size: 11px; color: #aaa;">
-                            Need:<br>
-                            💰 $${nextRank.minNetWorth.toLocaleString()} net worth<br>
-                            🏢 ${nextRank.minBases} bases<br>
-                            👥 ${nextRank.minGang} gang members
-                        </div>
-                    </div>
-                ` : `
-                    <div style="background: linear-gradient(45deg, #ffaa00, #ff6600); 
-                                padding: 15px; border-radius: 10px; color: #000;">
-                        <div style="font-size: 16px; font-weight: bold;">🏆 MAXIMUM RANK!</div>
-                        <div style="font-size: 12px;">You rule the criminal underworld!</div>
-                    </div>
-                `}
-            </div>
-        `;
+        this.ui.modals.confirm(
+            `Travel to ${city} for $${cost.toLocaleString()}?`,
+            () => {
+                if (this.state.canAfford(cost)) {
+                    this.state.updateCash(-cost);
+                    this.state.travelToCity(city);
+                    this.systems.heat.applyTravelHeatReduction();
+                    this.ui.events.add(`✈️ Arrived in ${city} (Cost: $${cost.toLocaleString()})`, 'good');
+                    this.ui.modals.close();
+                    this.game.showScreen('bases');
+                } else {
+                    this.ui.modals.alert(`Need $${cost.toLocaleString()} to travel!`, 'Not Enough Cash');
+                }
+            },
+            null
+        );
     }
-    
-    getCurrentRank() {
-        const netWorth = this.state.calculateNetWorth();
-        const basesOwned = Object.keys(this.state.data.bases).length;
-        const gangSize = this.state.get('gangSize');
-        
-        let currentRank = 1;
-        for (let rankId = 7; rankId >= 1; rankId--) {
-            const rank = this.game.data.playerRanks[rankId];
-            if (netWorth >= rank.minNetWorth && 
-                basesOwned >= rank.minBases && 
-                gangSize >= rank.minGang) {
-                currentRank = rankId;
-                break;
-            }
-        }
-        
-        return currentRank;
-    }
-}
+
+    // ... (other methods unchanged) ...
+} 

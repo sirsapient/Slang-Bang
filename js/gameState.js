@@ -49,7 +49,9 @@ export class GameState {
         this.countdownTimer = null;
         this.dayDuration = 60000; // 60 seconds per day
         this.timeRemaining = this.dayDuration;
-        
+
+        // Police raid loss tracking (not saved)
+        this.raidLossHistory = [];
         // Event listeners
         this.listeners = {};
     }
@@ -247,6 +249,23 @@ export class GameState {
         }
         
         return Math.floor(netWorth);
+    }
+
+    // Police raid loss tracking
+    addRaidLoss(amount) {
+        const now = Date.now();
+        this.raidLossHistory.push({ amount, time: now });
+        // Remove entries older than 24 hours
+        const cutoff = now - 24 * 60 * 60 * 1000;
+        this.raidLossHistory = this.raidLossHistory.filter(entry => entry.time >= cutoff);
+    }
+
+    getRaidLossLast24h() {
+        const now = Date.now();
+        const cutoff = now - 24 * 60 * 60 * 1000;
+        return this.raidLossHistory
+            .filter(entry => entry.time >= cutoff)
+            .reduce((sum, entry) => sum + entry.amount, 0);
     }
 }
 

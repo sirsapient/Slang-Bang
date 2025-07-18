@@ -213,19 +213,20 @@ export class BaseSystem {
     storeDrugsInBase(city, drug, amount) {
         const base = this.state.getBase(city);
         if (!base) return false;
-        
         const baseType = this.data.baseTypes[base.level];
         const currentStorage = this.getBaseDrugCount(base);
         const spaceAvailable = baseType.maxInventory - currentStorage;
-        
-        if (spaceAvailable <= 0) {
-            this.events.add('Base storage is full', 'bad');
+        // Per-drug cap
+        const drugsCount = Object.keys(this.data.drugs).length;
+        const perDrugCap = Math.floor(baseType.maxInventory / drugsCount);
+        const currentDrugAmount = base.inventory[drug] || 0;
+        const perDrugSpace = perDrugCap - currentDrugAmount;
+        if (spaceAvailable <= 0 || perDrugSpace <= 0) {
+            this.events.add('Base storage is full for this drug', 'bad');
             return false;
         }
-        
         const playerHas = this.state.getInventory(drug);
-        const actualAmount = Math.min(amount, playerHas, spaceAvailable);
-        
+        const actualAmount = Math.min(amount, playerHas, spaceAvailable, perDrugSpace);
         if (actualAmount > 0) {
             this.state.updateInventory(drug, -actualAmount);
             base.inventory[drug] = (base.inventory[drug] || 0) + actualAmount;
@@ -233,7 +234,6 @@ export class BaseSystem {
             this.events.add(`Stored ${actualAmount} ${drug} in ${city} base`, 'good');
             return true;
         }
-        
         return false;
     }
     
@@ -306,5 +306,30 @@ export class BaseSystem {
             totalCashStored,
             dailyIncome: this.calculateTotalDailyIncome()
         };
+    }
+
+    // Process real-time sales for all bases (called every minute)
+    processRealTimeSales() {
+        const UNITS_PER_MIN = 1 / 60; // 0.01667 units per minute
+        Object.values(this.state.data.bases).forEach(base => {
+            if (!base.operational) return;
+            const city = base.city;
+            const cityPrices = this.state.cityPrices[city] || {};
+            let soldAny = false;
+            Object.keys(base.inventory).forEach(drug => {
+                let available = base.inventory[drug];
+                if (available >= 0.01) {
+                    const toSell = Math.min(UNITS_PER_MIN, available);
+                    const price = cityPrices[drug] || 0;
+                    const profit = toSell * price * 3;
+                    base.inventory[drug] -= toSell;
+                    base.cashStored = (base.cashStored || 0) + profit;
+                    soldAny = true;
+                }
+            });
+            if (soldAny) {
+                this.updateBaseOperationalStatus(city);
+            }
+        });
     }
 }

@@ -82,16 +82,18 @@ export class TravelScreen {
         let message = `Travel to ${cityName} for $${cost.toLocaleString()}?`;
         
         if (heatLevel >= 40) {
-            message += '\n\n🌊 Traveling will reduce your heat level!';
+            message += '<br><br>🌊 Traveling will reduce your heat level!';
         }
         
         if (this.state.hasBase(cityName)) {
-            message += '\n\n🏢 You have a base in this city.';
+            message += '<br><br>🏢 You have a base in this city.';
         }
         
-        if (confirm(message)) {
-            this.executeTravel(cityName, cost);
-        }
+        this.ui.modals.confirm(
+            message,
+            () => this.executeTravel(cityName, cost),
+            null
+        );
     }
     
     executeTravel(cityName, cost) {
@@ -103,6 +105,10 @@ export class TravelScreen {
         
         // Apply heat reduction
         this.systems.heat.applyTravelHeatReduction();
+        
+        // Trigger police raid and gang heat (now only on travel)
+        this.systems.heat.checkPoliceRaid();
+        this.systems.heat.generateGangHeat();
         
         // Log event
         this.ui.events.add(`✈️ Arrived in ${cityName} (Cost: $${cost.toLocaleString()})`, 'good');

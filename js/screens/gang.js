@@ -281,6 +281,7 @@ export class GangScreen {
         
         // Operations unlocked
         const operationsAvailable = [];
+        if (gangSize >= 3) operationsAvailable.push('⚔️ Base Raids');
         if (gangSize >= 4) operationsAvailable.push('🏢 Base Operations');
         if (gangSize >= 10) operationsAvailable.push('⚔️ Turf Wars');
         if (gangSize >= 20) operationsAvailable.push('🎯 Territory Raids');
