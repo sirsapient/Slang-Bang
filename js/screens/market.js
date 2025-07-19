@@ -10,6 +10,11 @@ export class MarketScreen {
     
     render() {
         this.selectedCity = this.selectedCity || this.state.get('currentCity');
+        const currentCity = this.state.get('currentCity');
+        const cities = Object.keys(this.game.data.cities);
+        
+        // Reorder cities to put current city first
+        const reorderedCities = [currentCity, ...cities.filter(city => city !== currentCity)];
         
         return `
             <div class="screen-header">
@@ -29,7 +34,7 @@ export class MarketScreen {
                     border-radius: 8px;
                     font-family: inherit;
                 ">
-                    ${Object.keys(this.game.data.cities).map(city => 
+                    ${reorderedCities.map(city => 
                         `<option value="${city}" ${city === this.selectedCity ? 'selected' : ''}>${city}</option>`
                     ).join('')}
                 </select>

@@ -1,21 +1,30 @@
 // js/systems/heat.js - Heat and warrant management system
+import { formatCurrency, formatNumber } from '../utils.js';
+/**
+ * HeatSystem manages heat, warrant, raids, and bribery logic.
+ */
 export class HeatSystem {
     constructor(gameState, eventLogger) {
         this.state = gameState;
         this.events = eventLogger;
     }
-    
-    // Calculate current heat level based on warrant and time in city
+
+    /**
+     * Calculate current heat level based on warrant and time in city.
+     * @returns {number}
+     */
     calculateHeatLevel() {
         const warrantHeat = Math.min(this.state.get('warrant') / 10000, 50);
         const timeHeat = Math.max(0, this.state.get('daysInCurrentCity') - 3) * 5;
         const totalHeat = warrantHeat + timeHeat;
-        
         this.state.set('heatLevel', Math.min(100, totalHeat));
         return this.state.get('heatLevel');
     }
-    
-    // Get heat level as text
+
+    /**
+     * Get heat level as text.
+     * @returns {string}
+     */
     getHeatLevelText() {
         const heat = this.state.get('heatLevel');
         if (heat < 20) return 'Low';
@@ -23,8 +32,11 @@ export class HeatSystem {
         if (heat < 70) return 'High';
         return 'Critical';
     }
-    
-    // Get heat level color class
+
+    /**
+     * Get heat level color class.
+     * @returns {string}
+     */
     getHeatColorClass() {
         const heat = this.state.get('heatLevel');
         if (heat < 20) return 'heat-low';
@@ -32,38 +44,36 @@ export class HeatSystem {
         if (heat < 70) return 'heat-high';
         return 'heat-critical';
     }
-    
-    // Apply warrant decay when staying in same city
+
+    /**
+     * Apply warrant decay when staying in same city.
+     */
     applyWarrantDecay() {
         const daysSinceTravel = this.state.get('daysSinceTravel');
-        
         if (daysSinceTravel > 0) {
-            let decayRate = 0.02; // Base 2% decay
-            
+            let decayRate = 0.02;
             if (daysSinceTravel >= 3) decayRate = 0.035;
             if (daysSinceTravel >= 7) decayRate = 0.05;
             if (daysSinceTravel >= 14) decayRate = 0.08;
-            
             const currentWarrant = this.state.get('warrant');
             const warrantReduction = Math.floor(currentWarrant * decayRate);
-            
             if (warrantReduction > 0) {
                 this.state.updateWarrant(-warrantReduction);
-                
                 if (daysSinceTravel === 3) {
-                    this.events.add(`🕊️ Laying low is working - warrant reduced by ${warrantReduction.toLocaleString()}`, 'good');
+                    this.events.add(`🕊️ Laying low is working - warrant reduced by ${formatNumber(warrantReduction)}`, 'good');
                 } else if (daysSinceTravel === 7) {
-                    this.events.add(`😎 Heat cooling down - warrant reduced by ${warrantReduction.toLocaleString()}`, 'good');
+                    this.events.add(`😎 Heat cooling down - warrant reduced by ${formatNumber(warrantReduction)}`, 'good');
                 } else if (daysSinceTravel >= 14 && daysSinceTravel % 7 === 0) {
-                    this.events.add(`🏖️ Deep cover paying off - warrant reduced by ${warrantReduction.toLocaleString()}`, 'good');
+                    this.events.add(`🏖️ Deep cover paying off - warrant reduced by ${formatNumber(warrantReduction)}`, 'good');
                 }
             }
         }
     }
-    
-    // Check for police raids based on heat level
+
+    /**
+     * Check for police raids based on heat level.
+     */
     checkPoliceRaid() {
-        // Only trigger a raid if player has drugs in their personal inventory
         const inventory = this.state.get('inventory');
         const hasDrugs = Object.values(inventory).some(amount => amount > 0);
         if (!hasDrugs) {
@@ -71,19 +81,18 @@ export class HeatSystem {
             return;
         }
         const heat = this.calculateHeatLevel();
-        
         if (heat >= 70) {
             const raidChance = Math.min(0.3, (heat - 70) / 100);
-            
             if (Math.random() < raidChance) {
                 this.executePoliceRaid();
             }
         }
     }
-    
-    // Execute a police raid
+
+    /**
+     * Execute a police raid.
+     */
     executePoliceRaid() {
-        // Only raid if player has drugs in their personal inventory
         const inventory = this.state.get('inventory');
         const hasDrugs = Object.values(inventory).some(amount => amount > 0);
         if (!hasDrugs) {
@@ -97,11 +106,9 @@ export class HeatSystem {
             this.state.updateWarrant(-Math.floor(this.state.get('warrant') * 0.5));
             return;
         }
-        // Gun protection reduces losses
         const gunProtection = Math.min(0.4, guns * 0.02);
         const baseLossPercent = 0.3 + Math.random() * 0.4;
         const actualLossPercent = Math.max(0.1, baseLossPercent - gunProtection);
-        // Lose drugs
         const drugsLost = [];
         Object.keys(inventory).forEach(drug => {
             const currentAmount = inventory[drug];
@@ -111,7 +118,6 @@ export class HeatSystem {
                 drugsLost.push(`${lost} ${drug}`);
             }
         });
-        // Lose cash (capped to 5% of cash in 24h)
         const cash = this.state.get('cash');
         const maxLoss24h = Math.floor(cash * 0.05);
         const alreadyLost = this.state.getRaidLossLast24h ? this.state.getRaidLossLast24h() : 0;
@@ -122,27 +128,23 @@ export class HeatSystem {
             this.state.updateCash(-cashLoss);
             if (this.state.addRaidLoss) this.state.addRaidLoss(cashLoss);
         }
-        // Lose guns
         const gunsLost = Math.floor(guns * (0.1 + Math.random() * 0.2));
         this.state.set('guns', Math.max(0, guns - gunsLost));
-        // Increase warrant
         const warrantIncrease = 5000 + Math.floor(Math.random() * 10000);
         this.state.updateWarrant(warrantIncrease);
-        // Asset protection event
         const assetValue = window.game?.systems?.assets?.getTotalAssetValue() || 0;
         if (assetValue > 0) {
             this.events.add('💎 Your assets were protected from the raid!', 'good');
         }
-        // Build raid message
         let raidMessage = `🚔 POLICE RAID! Lost `;
         if (drugsLost.length > 0) {
             raidMessage += drugsLost.join(', ') + ', ';
         }
-        raidMessage += `${cashLoss.toLocaleString()} cash`;
+        raidMessage += `${formatNumber(cashLoss)} cash`;
         if (gunsLost > 0) {
-            raidMessage += `, ${gunsLost} guns`;
+            raidMessage += `, ${formatNumber(gunsLost)} guns`;
         }
-        raidMessage += `, +${warrantIncrease.toLocaleString()} warrant`;
+        raidMessage += `, +${formatNumber(warrantIncrease)} warrant`;
         if (gunProtection > 0) {
             this.events.add(`🔫 Guns reduced raid losses by ${Math.floor(gunProtection * 100)}%`, 'good');
         }
@@ -151,10 +153,11 @@ export class HeatSystem {
         }
         this.events.add(raidMessage, 'bad');
     }
-    
-    // Generate heat from gang activities
+
+    /**
+     * Generate heat from gang activities.
+     */
     generateGangHeat() {
-        // Only generate heat if player has drugs in their personal inventory (not bases)
         const gangSize = this.state.get('gangSize');
         const inventory = this.state.get('inventory');
         const hasDrugs = Object.values(inventory).some(amount => amount > 0);
@@ -162,48 +165,50 @@ export class HeatSystem {
             const warrantIncrease = Math.floor(gangSize * 100 * Math.random());
             if (warrantIncrease > 0) {
                 this.state.updateWarrant(warrantIncrease);
-                this.events.add(`Gang activities increased heat by ${warrantIncrease.toLocaleString()}`, 'bad');
+                this.events.add(`Gang activities increased heat by ${formatNumber(warrantIncrease)}`, 'bad');
             }
         }
     }
-    
-    // Handle travel heat reduction
+
+    /**
+     * Handle travel heat reduction.
+     */
     applyTravelHeatReduction() {
         const currentWarrant = this.state.get('warrant');
         const heatReduction = Math.floor(currentWarrant * 0.4);
-        
         if (heatReduction > 0) {
             this.state.updateWarrant(-heatReduction);
-            this.events.add(`🌊 Travel cooled you down, heat reduced by ${heatReduction.toLocaleString()}`, 'good');
+            this.events.add(`🌊 Travel cooled you down, heat reduced by ${formatNumber(heatReduction)}`, 'good');
         }
     }
-    
-    // Process bribery
+
+    /**
+     * Attempt to process bribery. Returns {success, error}.
+     * @param {number} cost
+     * @param {number} reduction
+     * @returns {{success: boolean, error?: string}}
+     */
     processBribery(cost, reduction) {
         if (!this.state.canAfford(cost)) {
-            this.events.add(`Can't afford bribe. Need ${cost.toLocaleString()}`, 'bad');
-            return false;
+            return { success: false, error: `Can't afford bribe. Need ${formatCurrency(cost)}` };
         }
-        
         this.state.updateCash(-cost);
         this.state.updateWarrant(-reduction);
-        
-        this.events.add(`💰 Paid ${cost.toLocaleString()} in bribes - warrant reduced by ${reduction.toLocaleString()}`, 'good');
-        
-        // Small chance of backfire
+        this.events.add(`💰 Paid ${formatCurrency(cost)} in bribes - warrant reduced by ${formatNumber(reduction)}`, 'good');
         if (Math.random() < 0.05) {
             const backfireWarrant = Math.floor(cost * 0.1);
             this.state.updateWarrant(backfireWarrant);
-            this.events.add(`🚨 Bribery discovered! Additional warrant: ${backfireWarrant.toLocaleString()}`, 'bad');
+            this.events.add(`🚨 Bribery discovered! Additional warrant: ${formatNumber(backfireWarrant)}`, 'bad');
         }
-        
-        return true;
+        return { success: true };
     }
-    
-    // Get heat warning message
+
+    /**
+     * Get heat warning message.
+     * @returns {string|null}
+     */
     getHeatWarning() {
         const heat = this.state.get('heatLevel');
-        
         if (heat >= 70) {
             return '🚨 CRITICAL: Police raids likely! Travel or pay bribes immediately!';
         } else if (heat >= 40) {
@@ -211,13 +216,15 @@ export class HeatSystem {
         }
         return null;
     }
-    
-    // Calculate bribery costs
+
+    /**
+     * Calculate bribery costs.
+     * @returns {{cost: number, reduction: number}}
+     */
     calculateBriberyCost() {
         const warrant = this.state.get('warrant');
         const cost = warrant * 2;
         const reduction = Math.floor(warrant * 0.75);
-        
         return { cost, reduction };
     }
 }

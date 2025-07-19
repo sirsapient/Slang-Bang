@@ -9,11 +9,35 @@ export class RaidScreen {
         this.raidGangSize = 3;
     }
     
+    onShow() {
+        // Add event listener for execute raid button
+        const executeBtn = document.getElementById('executeRaidBtn');
+        if (executeBtn) {
+            executeBtn.addEventListener('click', () => {
+                this.executeRaid();
+            });
+        }
+    }
+    
     render() {
         const currentCity = this.state.get('currentCity');
         const availableGang = this.state.getAvailableGangMembers();
+        const availableGangInCity = this.state.getAvailableGangMembersInCity(currentCity);
         const guns = this.state.get('guns');
         const targets = this.systems.raid.getAvailableTargets(currentCity);
+        
+        const baseInCity = this.state.getBase(currentCity);
+        console.log('Raid screen data:', {
+            currentCity,
+            availableGang,
+            availableGangInCity,
+            guns,
+            targetsCount: targets.length,
+            gangMembersInCity: this.state.getGangMembersInCity(currentCity),
+            assignedGangInCity: this.state.getGangMembersInCity(currentCity) - availableGangInCity,
+            hasBase: !!baseInCity,
+            baseAssignedGang: baseInCity ? baseInCity.assignedGang : 0
+        });
         
         return `
             <div class="screen-header">
@@ -25,17 +49,23 @@ export class RaidScreen {
             <!-- Raid Overview -->
             <div style="background: #333; border: 1px solid #666; border-radius: 10px; 
                         padding: 15px; margin-bottom: 20px;">
-                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; text-align: center;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 15px; text-align: center;">
                     <div>
-                        <div style="font-size: 12px; color: #aaa; margin-bottom: 5px;">👥 Available Gang</div>
+                        <div style="font-size: 12px; color: #aaa; margin-bottom: 5px;">👥 Total Gang</div>
                         <div style="font-size: 18px; color: #ffff00; font-weight: bold;">
                             ${availableGang}
                         </div>
                     </div>
                     <div>
-                        <div style="font-size: 12px; color: #aaa; margin-bottom: 5px;">🔫 Guns</div>
+                        <div style="font-size: 12px; color: #aaa; margin-bottom: 5px;">🗺️ In ${currentCity}</div>
                         <div style="font-size: 18px; color: #66ff66; font-weight: bold;">
-                            ${guns}
+                            ${this.state.getAvailableGangMembersInCity(currentCity)}
+                        </div>
+                    </div>
+                    <div>
+                        <div style="font-size: 12px; color: #aaa; margin-bottom: 5px;">🔫 Guns in ${currentCity}</div>
+                        <div style="font-size: 18px; color: #66ff66; font-weight: bold;">
+                            ${this.state.getAvailableGunsInCity(currentCity)}
                         </div>
                     </div>
                     <div>
@@ -47,7 +77,7 @@ export class RaidScreen {
                 </div>
             </div>
 
-            ${availableGang < 3 ? this.renderInsufficientGang() : this.renderRaidInterface(targets)}
+            ${availableGangInCity < 3 ? this.renderInsufficientGang() : this.renderRaidInterface(targets)}
         `;
     }
     
@@ -138,10 +168,11 @@ export class RaidScreen {
         
         if (!target) return '';
         
-        const availableGang = this.state.getAvailableGangMembers();
-        const guns = this.state.get('guns');
+        const currentCity = this.state.get('currentCity');
+        const availableGangInCity = this.state.getAvailableGangMembersInCity(currentCity);
+        const availableGunsInCity = this.state.getAvailableGunsInCity(currentCity);
         const successChance = this.systems.raid.calculateRaidSuccess(
-            this.raidGangSize, guns, target.difficulty, target.gangSize
+            this.raidGangSize, availableGunsInCity, target.difficulty, target.gangSize
         );
         const successColor = successChance > 0.7 ? '#66ff66' : 
                            successChance > 0.5 ? '#ffff00' : '#ff6666';
@@ -163,15 +194,15 @@ export class RaidScreen {
                 <!-- Gang Size Slider -->
                 <div style="margin-bottom: 15px;">
                     <div style="font-size: 12px; color: #aaa; margin-bottom: 8px;">
-                        👥 Gang Members: ${this.raidGangSize} / ${availableGang}
+                        👥 Gang Members in ${currentCity}: ${this.raidGangSize} / ${availableGangInCity}
                     </div>
-                    <input type="range" min="3" max="${Math.min(availableGang, 10)}" 
+                    <input type="range" min="3" max="${Math.min(availableGangInCity, 10)}" 
                            value="${this.raidGangSize}" 
                            oninput="game.screens.raid.updateGangSize(this.value)"
                            style="width: 100%;">
                     <div style="display: flex; justify-content: space-between; font-size: 10px; color: #666; margin-top: 5px;">
                         <span>3</span>
-                        <span>${Math.min(availableGang, 10)}</span>
+                        <span>${Math.min(availableGangInCity, 10)}</span>
                     </div>
                 </div>
                 
@@ -181,7 +212,7 @@ export class RaidScreen {
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 10px;">
                         <div>Your Gang: <span style="color: #ffff00;">${this.raidGangSize}</span></div>
                         <div>Enemy Guards: <span style="color: #ff6666;">${target.gangSize}</span></div>
-                        <div>Your Guns: <span style="color: #66ff66;">${guns}</span></div>
+                        <div>Your Guns: <span style="color: #66ff66;">${availableGunsInCity}</span></div>
                         <div>Difficulty: <span style="color: ${this.systems.raid.getDifficultyColor(target.difficulty)};">
                             ${this.systems.raid.getDifficultyText(target.difficulty)}
                         </span></div>
@@ -189,7 +220,7 @@ export class RaidScreen {
                 </div>
                 
                 <!-- Execute Raid -->
-                <button onclick="game.screens.raid.executeRaid()" 
+                <button id="executeRaidBtn" 
                         class="action-btn" style="width: 100%; padding: 12px; background: #660000; border-color: #ff6666;">
                     ⚔️ Execute Raid
                 </button>
@@ -208,17 +239,29 @@ export class RaidScreen {
     }
     
     executeRaid() {
+        console.log('executeRaid called');
+        console.log('selectedTarget:', this.selectedTarget);
+        console.log('raidGangSize:', this.raidGangSize);
+        
         if (!this.selectedTarget) {
             this.ui.events.add('Please select a target first', 'neutral');
             return;
         }
         
         const city = this.state.get('currentCity');
-        const result = this.systems.raid.executeRaid(city, this.selectedTarget, this.raidGangSize);
+        console.log('city:', city);
+        console.log('available gang in city:', this.state.getAvailableGangMembersInCity(city));
+        console.log('available guns in city:', this.state.getAvailableGunsInCity(city));
         
-        if (result) {
+        const result = this.systems.raid.executeRaid(city, this.selectedTarget, this.raidGangSize);
+        console.log('raid result:', result);
+        
+        if (result && typeof result === 'object') {
             this.showRaidResults(result);
+        } else {
+            console.log('Raid failed or returned false');
         }
+        // If result is false, the raid system already logged the error message
     }
     
     showRaidResults(result) {

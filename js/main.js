@@ -10,17 +10,15 @@ import { BasesScreen } from './screens/bases.js';
 import { HeatSystem } from './systems/heat.js';
 import { TradingSystem } from './systems/trading.js';
 import { BaseSystem } from './systems/base.js';
+import { AssetSystem } from './systems/assets.js';
 import { EventLogger } from './ui/events.js';
 import { ModalManager } from './ui/modals.js';
 import { updatePhoneTime } from './utils.js';
 
-import { AssetSystem } from './systems/assets.js';
 import { AssetsScreen } from './screens/assets.js';
-import { assetData } from './data/assetsData.js';
 import { TradingScreen } from './screens/trading.js';
 import { RaidSystem } from './systems/raid.js';
 import { RaidScreen } from './screens/raid.js';
-Object.assign(gameData, assetData);
 
 class Game {
     constructor() {
@@ -43,7 +41,7 @@ class Game {
         this.systems.heat = new HeatSystem(this.state, this.ui.events);
         this.systems.trading = new TradingSystem(this.state, this.ui.events, this.data);
         this.systems.bases = new BaseSystem(this.state, this.ui.events, this.data);
-        this.systems.assets = new AssetSystem(this.state, this.ui.events, assetData);
+        this.systems.assets = new AssetSystem(this.state, this.ui.events, this.data);
         this.systems.raid = new RaidSystem(this.state, this.ui.events, this.data);
         
         // Initialize screens
@@ -144,6 +142,9 @@ class Game {
         if (this.state.baseSalesTimer) {
             clearInterval(this.state.baseSalesTimer);
         }
+        if (this.state.baseRaidTimer) {
+            clearInterval(this.state.baseRaidTimer);
+        }
         // Start day advancement timer
         this.state.gameTimer = setInterval(() => {
             this.advanceDay();
@@ -160,6 +161,11 @@ class Game {
         this.state.baseSalesTimer = setInterval(() => {
             this.systems.bases.processRealTimeSales();
         }, 60000);
+        
+        // Start base raid checking timer (every 5 minutes)
+        this.state.baseRaidTimer = setInterval(() => {
+            this.systems.bases.checkForBaseRaids();
+        }, 300000);
         this.ui.events.add("⏰ Real-time mode activated - 60 seconds per day", 'neutral');
     }
     

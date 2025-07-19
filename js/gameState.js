@@ -33,6 +33,12 @@ export class GameState {
             // Bases
             bases: {},
             
+            // Gang members by city
+            gangMembers: {},
+            
+            // Guns by city
+            gunsByCity: {},
+            
             // Market data
             citySupply: {},
             lastPurchase: {},
@@ -58,7 +64,18 @@ export class GameState {
     
     // Basic getters/setters
     get(key) {
-        return this.data[key];
+        const value = this.data[key];
+        
+        // Special handling for cash to prevent NaN
+        if (key === 'cash') {
+            if (value === undefined || value === null || isNaN(value)) {
+                console.warn('Invalid cash value detected, resetting to 0:', value);
+                this.data.cash = 0;
+                return 0;
+            }
+        }
+        
+        return value;
     }
     
     set(key, value) {
@@ -75,12 +92,20 @@ export class GameState {
     updateInventory(drug, amount) {
         this.data.inventory[drug] = Math.max(0, (this.data.inventory[drug] || 0) + amount);
         this.emit('inventoryChanged', { drug, amount: this.data.inventory[drug] });
+        this.emit('stateChange', { key: 'inventory', value: { ...this.data.inventory } });
     }
     
     // Cash management
     updateCash(amount) {
         this.data.cash = Math.max(0, this.data.cash + amount);
         this.emit('cashChanged', this.data.cash);
+        this.emit('stateChange', { key: 'cash', value: this.data.cash });
+    }
+    
+    updateGuns(amount) {
+        this.data.guns = Math.max(0, this.data.guns + amount);
+        this.emit('gunsChanged', this.data.guns);
+        this.emit('stateChange', { key: 'guns', value: this.data.guns });
     }
     
     canAfford(amount) {
@@ -91,6 +116,109 @@ export class GameState {
     updateGangSize(amount) {
         this.data.gangSize = Math.max(0, this.data.gangSize + amount);
         this.emit('gangChanged', this.data.gangSize);
+        this.emit('stateChange', { key: 'gangSize', value: this.data.gangSize });
+    }
+    
+    // City-based gang management
+    addGangMembers(city, amount) {
+        console.log(`addGangMembers called: city=${city}, amount=${amount}`);
+        if (!this.data.gangMembers[city]) {
+            this.data.gangMembers[city] = 0;
+        }
+        this.data.gangMembers[city] += amount;
+        this.data.gangSize += amount;
+        console.log(`Gang members after adding: ${this.data.gangMembers[city]} in ${city}, total: ${this.data.gangSize}`);
+        this.emit('gangChanged', this.data.gangSize);
+        this.emit('gangMembersChanged', { city, amount: this.data.gangMembers[city] });
+        this.emit('stateChange', { key: 'gangMembers', value: { ...this.data.gangMembers } });
+    }
+    
+    getGangMembersInCity(city) {
+        return this.data.gangMembers[city] || 0;
+    }
+    
+    getAvailableGangMembersInCity(city) {
+        const totalInCity = this.getGangMembersInCity(city);
+        let assignedInCity = 0;
+        
+        // Check if there's a base in this city
+        const base = this.getBase(city);
+        if (base) {
+            assignedInCity = base.assignedGang || 0;
+        }
+        
+        const available = Math.max(0, totalInCity - assignedInCity);
+        
+        return available;
+    }
+    
+    removeGangMembersFromCity(city, amount) {
+        if (!this.data.gangMembers[city] || this.data.gangMembers[city] < amount) {
+            return false;
+        }
+        
+        this.data.gangMembers[city] -= amount;
+        this.data.gangSize -= amount;
+        
+        // If no more gang members in this city, remove the city entry
+        if (this.data.gangMembers[city] <= 0) {
+            delete this.data.gangMembers[city];
+        }
+        
+        this.emit('gangChanged', this.data.gangSize);
+        this.emit('gangMembersChanged', { city, amount: this.data.gangMembers[city] || 0 });
+        this.emit('stateChange', { key: 'gangMembers', value: { ...this.data.gangMembers } });
+        
+        return true;
+    }
+    
+    // City-based gun management
+    addGunsToCity(city, amount) {
+        if (!this.data.gunsByCity[city]) {
+            this.data.gunsByCity[city] = 0;
+        }
+        this.data.gunsByCity[city] += amount;
+        this.data.guns += amount;
+        this.emit('gunsChanged', this.data.guns);
+        this.emit('gunsByCityChanged', { city, amount: this.data.gunsByCity[city] });
+        this.emit('stateChange', { key: 'gunsByCity', value: { ...this.data.gunsByCity } });
+    }
+    
+    getGunsInCity(city) {
+        return this.data.gunsByCity[city] || 0;
+    }
+    
+    getAvailableGunsInCity(city) {
+        const totalInCity = this.getGunsInCity(city);
+        let assignedInCity = 0;
+        
+        // Check if there's a base in this city
+        const base = this.getBase(city);
+        if (base) {
+            assignedInCity = base.guns || 0;
+        }
+        
+        return Math.max(0, totalInCity - assignedInCity);
+    }
+    
+    removeGunsFromCity(city, amount) {
+        if (!this.data.gunsByCity[city] || this.data.gunsByCity[city] < amount) {
+            return false;
+        }
+        
+        this.data.gunsByCity[city] -= amount;
+        this.data.guns -= amount;
+        
+        // If no more guns in this city, remove the city entry
+        if (this.data.gunsByCity[city] <= 0) {
+            delete this.data.gunsByCity[city];
+        }
+        
+        this.emit('gunsChanged', this.data.guns);
+        this.emit('gunsByCityChanged', { city, amount: this.data.gunsByCity[city] || 0 });
+        this.emit('stateChange', { key: 'gunsByCity', value: { ...this.data.gunsByCity } });
+        
+        return true;
     }
     
     getAvailableGangMembers() {
@@ -106,6 +234,7 @@ export class GameState {
         this.data.warrant = Math.max(0, this.data.warrant + amount);
         this.calculateHeatLevel();
         this.emit('warrantChanged', this.data.warrant);
+        this.emit('stateChange', { key: 'warrant', value: this.data.warrant });
     }
     
     calculateHeatLevel() {
@@ -135,6 +264,7 @@ export class GameState {
     addBase(city, baseData) {
         this.data.bases[city] = baseData;
         this.emit('baseAdded', { city, base: baseData });
+        this.emit('stateChange', { key: 'bases', value: { ...this.data.bases } });
     }
     
     // City/Travel management
@@ -144,6 +274,7 @@ export class GameState {
         this.data.daysSinceTravel = 0;
         this.data.lastTravelDay = this.data.day;
         this.emit('cityChanged', city);
+        this.emit('stateChange', { key: 'currentCity', value: city });
     }
     
     // Save/Load functionality
@@ -163,6 +294,7 @@ export class GameState {
         
         console.log('Game saved');
         this.emit('gameSaved');
+        this.emit('stateChange', { key: 'save', value: true });
     }
     
     load() {
@@ -171,19 +303,31 @@ export class GameState {
             
             // Try memory first (Claude environment)
             if (window.gameSaveData) {
+                console.log('Loading from window.gameSaveData:', window.gameSaveData);
                 saveData = window.gameSaveData;
             }
             
             // Load from localStorage
             const saved = localStorage.getItem('slangBangSave');
-            if (saved) saveData = JSON.parse(saved);
+            if (saved) {
+                console.log('Loading from localStorage:', saved);
+                saveData = JSON.parse(saved);
+            }
             
             if (saveData) {
                 this.data = { ...this.data, ...saveData.gameState };
                 this.cityPrices = saveData.cityPrices || {};
                 this.timeRemaining = saveData.timeRemaining || this.dayDuration;
+                
+                // Validate critical values after loading
+                if (this.data.cash === undefined || this.data.cash === null || isNaN(this.data.cash)) {
+                    console.warn('Invalid cash value in save data, resetting to 5000:', this.data.cash);
+                    this.data.cash = 5000;
+                }
+                
                 console.log('Game loaded');
                 this.emit('gameLoaded');
+                this.emit('stateChange', { key: 'load', value: true });
                 return true;
             }
         } catch (error) {
@@ -216,6 +360,19 @@ export class GameState {
                 }
             });
         }
+    }
+    
+    /**
+     * Add a one-time event listener for the given event.
+     * @param {string} event
+     * @param {Function} callback
+     */
+    once(event, callback) {
+        const wrapper = (data) => {
+            this.off(event, wrapper);
+            callback(data);
+        };
+        this.on(event, wrapper);
     }
     
     // Utility methods
@@ -269,5 +426,29 @@ export class GameState {
     }
 }
 
+/**
+ * GameState Event System
+ *
+ * Available Events:
+ * - stateChange: { key, value } — Any state key changes
+ * - cashChanged: newCash (number)
+ * - inventoryChanged: { drug, amount } (drug name and new amount)
+ * - gangChanged: newGangSize (number)
+ * - warrantChanged: newWarrant (number)
+ * - baseAdded: { city, base }
+ * - cityChanged: newCity (string)
+ * - gameSaved: void
+ * - gameLoaded: void
+ * - (add more as needed for new state changes)
+ *
+ * Example Usage:
+ *   gameState.on('cashChanged', (newCash) => {
+ *     // Update UI with new cash value
+ *   });
+ *
+ *   gameState.once('gameLoaded', () => {
+ *     // Do something once after game loads
+ *   });
+ */
 // Export singleton instance
 export const gameState = new GameState();

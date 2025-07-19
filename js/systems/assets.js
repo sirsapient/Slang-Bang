@@ -1,25 +1,41 @@
 // js/systems/assets.js - Asset management system
+import { formatCurrency, formatNumber } from '../utils.js';
+/**
+ * AssetSystem manages all asset-related logic: buying, selling, flex score, storage, etc.
+ */
 export class AssetSystem {
     constructor(gameState, eventLogger, gameData) {
         this.state = gameState;
         this.events = eventLogger;
         this.data = gameData;
     }
-    
-    // Check if player has unlocked assets (Rank 4+)
+
+    /**
+     * Check if player has unlocked assets (Rank 4+)
+     * @returns {boolean}
+     */
     isUnlocked() {
         const rankId = this.getCurrentPlayerRank();
         return rankId >= 4;
     }
-    
+
+    /**
+     * Get the current player rank ID based on net worth, bases, and gang size.
+     * @returns {number} Current rank ID
+     */
     getCurrentPlayerRank() {
         const netWorth = this.state.calculateNetWorth();
         const basesOwned = Object.keys(this.state.data.bases).length;
         const gangSize = this.state.get('gangSize');
-        
+
         let currentRank = 1;
+        if (!this.data || !this.data.playerRanks) {
+            // Return error code for missing data, let UI handle alert
+            return -1;
+        }
         for (let rankId = 7; rankId >= 1; rankId--) {
             const rank = this.data.playerRanks[rankId];
+            if (!rank) continue;
             if (netWorth >= rank.minNetWorth && 
                 basesOwned >= rank.minBases && 
                 gangSize >= rank.minGang) {
@@ -27,75 +43,76 @@ export class AssetSystem {
                 break;
             }
         }
-        
         return currentRank;
     }
-    
-    // Initialize player assets if not exists
+
+    /**
+     * Initialize player assets if not exists
+     */
     initializeAssets() {
         if (!this.state.data.assets) {
             this.state.data.assets = {
-                owned: {},      // All owned assets by ID
-                wearing: {      // Currently worn items
-                    jewelry: []  // Array of jewelry IDs (max 2 without storage)
-                },
-                storage: {      // Storage capacity
-                    jewelry: 2,  // Default: can wear 2 jewelry
-                    cars: 0      // Default: no car storage
-                }
+                owned: {},
+                wearing: { jewelry: [] },
+                storage: { jewelry: 2, cars: 0 }
             };
         }
     }
-    
-    // Get all assets of a specific type
+
+    /**
+     * Get all assets of a specific type
+     * @param {string} type
+     * @returns {Array}
+     */
     getAssetsByType(type) {
         return this.data.assets.filter(asset => asset.type === type);
     }
-    
-    // Get owned assets
+
+    /**
+     * Get all owned assets, optionally filtered by type
+     * @param {string|null} type
+     * @returns {Object}
+     */
     getOwnedAssets(type = null) {
         this.initializeAssets();
         const owned = this.state.data.assets.owned;
-        
         if (!type) return owned;
-        
         const filtered = {};
         Object.entries(owned).forEach(([id, asset]) => {
             if (asset.type === type) {
                 filtered[id] = asset;
             }
         });
-        
         return filtered;
     }
-    
-    // Get worn jewelry
+
+    /**
+     * Get IDs of worn jewelry
+     * @returns {Array<string>}
+     */
     getWornJewelry() {
         this.initializeAssets();
         return this.state.data.assets.wearing.jewelry || [];
     }
-    
-    // Calculate total flex score
+
+    /**
+     * Calculate total flex score
+     * @returns {number}
+     */
     calculateFlexScore() {
         this.initializeAssets();
         let flexScore = 0;
-        
-        // Add flex from worn jewelry
         this.getWornJewelry().forEach(jewelryId => {
             const jewelry = this.state.data.assets.owned[jewelryId];
             if (jewelry) {
                 flexScore += jewelry.flexScore || 0;
             }
         });
-        
-        // Add flex from all owned cars
         Object.values(this.state.data.assets.owned).forEach(asset => {
             if (asset.type === 'car') {
                 flexScore += asset.flexScore || 0;
             }
         });
-        
-        // Add flex from best house
         let bestHouseFlex = 0;
         Object.values(this.state.data.assets.owned).forEach(asset => {
             if (asset.type === 'property') {
@@ -103,198 +120,178 @@ export class AssetSystem {
             }
         });
         flexScore += bestHouseFlex;
-        
         return flexScore;
     }
-    
-    // Purchase asset
+
+    /**
+     * Attempt to purchase an asset. Returns {success, error}.
+     * @param {string} assetId
+     * @returns {{success: boolean, error?: string}}
+     */
     purchaseAsset(assetId) {
         const asset = this.data.assets.find(a => a.id === assetId);
         if (!asset) {
-            this.events.add('Asset not found', 'bad');
-            return false;
+            return { success: false, error: 'Asset not found' };
         }
-        
         if (!this.isUnlocked()) {
-            this.events.add('Asset Store unlocks at Rank 4 (District Chief)', 'bad');
-            return false;
+            return { success: false, error: 'Asset Store unlocks at Rank 4 (District Chief)' };
         }
-        
         if (!this.state.canAfford(asset.cost)) {
-            this.events.add(`Can't afford ${asset.name}. Need $${asset.cost.toLocaleString()}`, 'bad');
-            return false;
+            return { success: false, error: `Can't afford ${asset.name}. Need ${formatCurrency(asset.cost)}` };
         }
-        
-        // Check storage capacity for cars
         if (asset.type === 'car') {
             const ownedCars = Object.values(this.getOwnedAssets('car')).length;
             const carCapacity = this.getStorageCapacity().cars;
-            
             if (ownedCars >= carCapacity && carCapacity > 0) {
-                this.events.add('No car storage available. Buy a house first!', 'bad');
-                return false;
+                return { success: false, error: 'No car storage available. Buy a house first!' };
             }
         }
-        
-        // Execute purchase
         this.initializeAssets();
         this.state.updateCash(-asset.cost);
-        
-        // Add to owned assets
         this.state.data.assets.owned[assetId] = {
             ...asset,
             purchaseDate: this.state.get('day'),
             purchasePrice: asset.cost
         };
-        
-        // Update storage capacity if it's a property
         if (asset.type === 'property' && asset.capacity) {
             this.updateStorageCapacity(asset.capacity);
         }
-        
-        this.events.add(`💎 Purchased ${asset.name} for $${asset.cost.toLocaleString()}`, 'good');
-        
-        // Auto-wear jewelry if slots available
+        this.events.add(`💎 Purchased ${asset.name} for ${formatCurrency(asset.cost)}`, 'good');
         if (asset.type === 'jewelry' && this.canWearMoreJewelry()) {
             this.wearJewelry(assetId);
         }
-        
-        return true;
+        return { success: true };
     }
     
-    // Sell asset
+    /**
+     * Attempt to sell an asset. Returns {success, error}.
+     * @param {string} assetId
+     * @returns {{success: boolean, error?: string}}
+     */
     sellAsset(assetId) {
         this.initializeAssets();
         const asset = this.state.data.assets.owned[assetId];
-        
         if (!asset) {
-            this.events.add('You don\'t own this asset', 'bad');
-            return false;
+            return { success: false, error: "You don't own this asset" };
         }
-        
         // Remove from wearing if worn
         if (asset.type === 'jewelry') {
             this.removeJewelry(assetId);
         }
-        
         // Calculate resale value
         const resaleValue = asset.resaleValue || Math.floor(asset.cost * 0.9);
-        
         // Remove from owned
         delete this.state.data.assets.owned[assetId];
-        
         // Update cash
         this.state.updateCash(resaleValue);
-        
         // Reduce storage if selling property
         if (asset.type === 'property' && asset.capacity) {
             this.reduceStorageCapacity(asset.capacity);
         }
-        
-        this.events.add(`💰 Sold ${asset.name} for $${resaleValue.toLocaleString()}`, 'good');
-        return true;
+        this.events.add(`💰 Sold ${asset.name} for ${formatCurrency(resaleValue)}`, 'good');
+        return { success: true };
     }
-    
-    // Wear jewelry
+
+    /**
+     * Attempt to wear a jewelry item. Returns {success, error}.
+     * @param {string} jewelryId
+     * @returns {{success: boolean, error?: string}}
+     */
     wearJewelry(jewelryId) {
         this.initializeAssets();
         const jewelry = this.state.data.assets.owned[jewelryId];
-        
         if (!jewelry || jewelry.type !== 'jewelry') {
-            this.events.add('Invalid jewelry item', 'bad');
-            return false;
+            return { success: false, error: 'Invalid jewelry item' };
         }
-        
         const wearing = this.state.data.assets.wearing.jewelry;
         const maxWearable = this.getMaxWearableJewelry();
-        
-        // Check if already wearing
         if (wearing.includes(jewelryId)) {
-            this.events.add(`Already wearing ${jewelry.name}`, 'neutral');
-            return false;
+            return { success: false, error: `Already wearing ${jewelry.name}` };
         }
-        
-        // Check capacity
         if (wearing.length >= maxWearable) {
-            this.events.add(`Can only wear ${maxWearable} jewelry items. Remove one first or buy storage!`, 'bad');
-            return false;
+            return { success: false, error: `Can only wear ${maxWearable} jewelry items. Remove one first or buy storage!` };
         }
-        
-        // Wear the jewelry
         wearing.push(jewelryId);
         this.events.add(`💍 Now wearing ${jewelry.name} (+${jewelry.flexScore} flex)`, 'good');
-        return true;
+        return { success: true };
     }
-    
-    // Remove jewelry
+
+    /**
+     * Remove a jewelry item from wearing. Returns {success, error}.
+     * @param {string} jewelryId
+     * @returns {{success: boolean, error?: string}}
+     */
     removeJewelry(jewelryId) {
         this.initializeAssets();
         const wearing = this.state.data.assets.wearing.jewelry;
         const index = wearing.indexOf(jewelryId);
-        
         if (index > -1) {
             const jewelry = this.state.data.assets.owned[jewelryId];
             wearing.splice(index, 1);
-            
             if (jewelry) {
                 this.events.add(`Removed ${jewelry.name}`, 'neutral');
             }
-            return true;
+            return { success: true };
         }
-        
-        return false;
+        return { success: false, error: 'Jewelry not currently worn' };
     }
-    
-    // Get storage capacity
+
+    /**
+     * Get storage capacity for jewelry and cars.
+     * @returns {{jewelry: number, cars: number}}
+     */
     getStorageCapacity() {
         this.initializeAssets();
         return this.state.data.assets.storage;
     }
-    
-    // Get max wearable jewelry
+
+    /**
+     * Get max wearable jewelry slots.
+     * @returns {number}
+     */
     getMaxWearableJewelry() {
         const storage = this.getStorageCapacity();
         return storage.jewelry || 2;
     }
-    
-    // Check if can wear more jewelry
+
+    /**
+     * Check if player can wear more jewelry.
+     * @returns {boolean}
+     */
     canWearMoreJewelry() {
         const wearing = this.getWornJewelry();
         const max = this.getMaxWearableJewelry();
         return wearing.length < max;
     }
-    
-    // Update storage capacity when buying property
+
+    /**
+     * Update storage capacity when buying property.
+     * @param {Object} capacity
+     */
     updateStorageCapacity(capacity) {
         this.initializeAssets();
         const storage = this.state.data.assets.storage;
-        
-        // Take the best capacity from all owned properties
-        let bestJewelryCapacity = 2; // Base capacity
+        let bestJewelryCapacity = 2;
         let bestCarCapacity = 0;
-        
         Object.values(this.state.data.assets.owned).forEach(asset => {
             if (asset.type === 'property' && asset.capacity) {
                 bestJewelryCapacity = Math.max(bestJewelryCapacity, asset.capacity.jewelry || 2);
                 bestCarCapacity = Math.max(bestCarCapacity, asset.capacity.cars || 0);
             }
         });
-        
         storage.jewelry = bestJewelryCapacity;
         storage.cars = bestCarCapacity;
     }
-    
-    // Reduce storage when selling property
+
+    /**
+     * Reduce storage when selling property. Removes excess jewelry if needed.
+     * @param {Object} capacity
+     */
     reduceStorageCapacity(capacity) {
-        // Recalculate from remaining properties
         this.updateStorageCapacity({});
-        
-        // Check if we need to remove worn jewelry
         const wearing = this.getWornJewelry();
         const maxWearable = this.getMaxWearableJewelry();
-        
         if (wearing.length > maxWearable) {
-            // Remove excess jewelry
             const toRemove = wearing.length - maxWearable;
             for (let i = 0; i < toRemove; i++) {
                 const jewelryId = wearing[wearing.length - 1];
@@ -303,35 +300,36 @@ export class AssetSystem {
             }
         }
     }
-    
-    // Get total asset value
+
+    /**
+     * Get total asset value.
+     * @returns {number}
+     */
     getTotalAssetValue() {
         this.initializeAssets();
         let total = 0;
-        
         Object.values(this.state.data.assets.owned || {}).forEach(asset => {
             total += asset.resaleValue || Math.floor(asset.cost * 0.9);
         });
-        
         return total;
     }
-    
-    // Get asset summary
+
+    /**
+     * Get a summary of owned assets.
+     * @returns {Object}
+     */
     getAssetSummary() {
         this.initializeAssets();
         const owned = this.state.data.assets.owned;
         const wearing = this.getWornJewelry();
-        
         let jewelryCount = 0;
         let carCount = 0;
         let propertyCount = 0;
-        
         Object.values(owned).forEach(asset => {
             if (asset.type === 'jewelry') jewelryCount++;
             else if (asset.type === 'car') carCount++;
             else if (asset.type === 'property') propertyCount++;
         });
-        
         return {
             totalAssets: Object.keys(owned).length,
             jewelryCount,

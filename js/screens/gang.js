@@ -186,16 +186,17 @@ export class GangScreen {
         
         const costPerMember = this.calculateGangMemberCost();
         const totalCost = costPerMember * quantity;
+        const currentCity = this.state.get('currentCity');
         
         if (this.state.canAfford(totalCost)) {
             this.state.updateCash(-totalCost);
-            this.state.updateGangSize(quantity);
+            this.state.addGangMembers(currentCity, quantity);
             
             // Add heat
             const heatIncrease = quantity * this.game.data.config.gangRecruitHeat;
             this.state.updateWarrant(heatIncrease);
             
-            this.ui.events.add(`Recruited ${quantity} gang members for $${totalCost.toLocaleString()}`, 'good');
+            this.ui.events.add(`Recruited ${quantity} gang members in ${currentCity} for $${totalCost.toLocaleString()}`, 'good');
             this.ui.events.add(`Gang recruitment increased heat by ${heatIncrease.toLocaleString()}`, 'bad');
             
             // Reset form and refresh
@@ -254,6 +255,45 @@ export class GangScreen {
                 </div>
             </div>
         `;
+        
+        // Gang members by city
+        const gangMembers = this.state.data.gangMembers || {};
+        const citiesWithGang = Object.keys(gangMembers).filter(city => gangMembers[city] > 0);
+        
+        if (citiesWithGang.length > 0) {
+            content += `
+                <div style="background: #222; border: 1px solid #444; border-radius: 10px; 
+                            padding: 15px; margin-bottom: 15px;">
+                    <div style="font-size: 14px; color: #ffff00; margin-bottom: 15px; text-align: center;">
+                        🗺️ Gang Members by City
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                        ${citiesWithGang.map(city => {
+                            const totalInCity = gangMembers[city];
+                            const availableInCity = this.state.getAvailableGangMembersInCity(city);
+                            const assignedInCity = totalInCity - availableInCity;
+                            
+                            return `
+                                <div style="background: #1a1a1a; padding: 10px; border-radius: 5px;">
+                                    <div style="font-size: 12px; color: #aaa; margin-bottom: 5px;">${city}</div>
+                                    <div style="font-size: 14px; color: #ffff00; font-weight: bold;">
+                                        ${totalInCity} total
+                                    </div>
+                                    <div style="font-size: 10px; color: #66ff66;">
+                                        ${availableInCity} available
+                                    </div>
+                                    ${assignedInCity > 0 ? 
+                                        `<div style="font-size: 10px; color: #ff6666;">
+                                            ${assignedInCity} assigned
+                                        </div>` : ''
+                                    }
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                </div>
+            `;
+        }
         
         // Gang tier
         let currentTier = null;

@@ -1,4 +1,3 @@
-// js/ui/modals.js - Modal management system
 let modalManagerInstanceId = 0;
 
 export class ModalManager {
@@ -51,11 +50,20 @@ export class ModalManager {
             this.container.appendChild(this.modalOverlayContainer);
         }
         this.modalOverlayContainer.style.display = 'flex';
-        // Do NOT clear callbacks here!
-        console.log('show() called on instance', this._instanceId);
-        // Close any existing modal
-        this.close();
         
+        console.log('show() called on instance', this._instanceId);
+        
+        // Close any existing modal first
+        if (this.activeModal) {
+            this.close();
+            // Wait for close animation
+            setTimeout(() => this._showModal(modal), 350);
+        } else {
+            this._showModal(modal);
+        }
+    }
+    
+    _showModal(modal) {
         // Create modal element
         const modalElement = document.createElement('div');
         modalElement.className = 'modal-overlay';
@@ -63,7 +71,7 @@ export class ModalManager {
             <div class="modal-content" style="max-width: ${modal.options.maxWidth || '500px'};">
                 <div class="modal-header">
                     ${modal.title}
-                    <button id="modalCloseBtn" class="modal-close">×</button>
+                    <button class="modal-close">×</button>
                 </div>
                 <div class="modal-body">
                     ${modal.content}
@@ -80,6 +88,7 @@ export class ModalManager {
         
         // Add to DOM
         this.modalOverlayContainer.appendChild(modalElement);
+        console.log('Modal overlay appended', modalElement);
         modal.element = modalElement;
         this.activeModal = modal;
         
@@ -87,47 +96,82 @@ export class ModalManager {
         modalElement.style.opacity = '0';
         modalElement.style.pointerEvents = 'auto';
         this.modalOverlayContainer.style.pointerEvents = 'auto';
+        console.log('Modal overlay style after append', modalElement.style);
         
         // Add event listeners for modal buttons
         const confirmBtn = modalElement.querySelector('#modalConfirmBtn');
         const cancelBtn = modalElement.querySelector('#modalCancelBtn');
-        const closeBtn = modalElement.querySelector('#modalCloseBtn');
-        if (confirmBtn) confirmBtn.addEventListener('click', () => this.handleConfirm());
-        if (cancelBtn) cancelBtn.addEventListener('click', () => this.close());
-        if (closeBtn) closeBtn.addEventListener('click', () => this.close());
+        const closeBtn = modalElement.querySelector('.modal-close');
         
-        // Add event listeners for prompt modal buttons (these still use IDs)
+        if (confirmBtn) {
+            confirmBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                this.handleConfirm();
+            });
+        }
+        
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                if (this.cancelCallback) {
+                    this.cancelCallback();
+                }
+                this.close();
+            });
+        }
+        
+        if (closeBtn) {
+            closeBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                this.close();
+            });
+        }
+        
+        // Add event listeners for prompt modal buttons
         const promptSubmitBtn = modalElement.querySelector('#modalPromptSubmitBtn');
         const promptCancelBtn = modalElement.querySelector('#modalPromptCancelBtn');
+        
         if (promptSubmitBtn) {
             const inputId = promptSubmitBtn.getAttribute('data-input-id');
-            promptSubmitBtn.addEventListener('click', () => this.handlePromptSubmit(inputId));
+            promptSubmitBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                this.handlePromptSubmit(inputId);
+            });
         }
+        
         if (promptCancelBtn) {
-            promptCancelBtn.addEventListener('click', () => this.close());
+            promptCancelBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                this.close();
+            });
         }
         
         // Fade in effect
         setTimeout(() => {
             modalElement.style.opacity = '1';
+            console.log('Modal overlay style after fade-in', modalElement.style);
         }, 10);
     }
     
     close() {
         console.log('close() called on instance', this._instanceId, 'activeModal:', this.activeModal);
+        console.trace(); // Print the call stack for debugging
         if (this.activeModal && this.activeModal.element) {
             const element = this.activeModal.element;
             // Fade out effect
             element.style.opacity = '0';
             setTimeout(() => {
                 element.remove();
-                // Only clear callbacks if no new modal is being shown
-                if (!this.activeModal) {
-                    this.confirmCallback = null;
-                    this.cancelCallback = null;
-                    this.promptCallback = null;
-                }
                 this.activeModal = null;
+                // Clear callbacks after modal is removed
+                this.confirmCallback = null;
+                this.cancelCallback = null;
+                this.promptCallback = null;
                 this.modalOverlayContainer.style.pointerEvents = 'none';
                 if (this.modalOverlayContainer.childElementCount === 0) {
                     // Remove the container from the DOM entirely
@@ -139,11 +183,20 @@ export class ModalManager {
             }, 300);
         } else {
             console.log('close() called but no active modal to remove');
+            // Clear callbacks even if no modal
+            this.confirmCallback = null;
+            this.cancelCallback = null;
+            this.promptCallback = null;
         }
     }
     
     confirm(message, onConfirm, onCancel) {
         console.log('confirm() called on instance', this._instanceId);
+        
+        // Store callbacks before creating modal
+        this.confirmCallback = onConfirm;
+        this.cancelCallback = onCancel;
+        
         const content = `
             <div style="text-align: center; padding: 20px;">
                 <p style="margin-bottom: 20px;">${message}</p>
@@ -152,19 +205,18 @@ export class ModalManager {
             </div>
         `;
         
-        this.confirmCallback = onConfirm;
-        this.cancelCallback = onCancel;
-        
         const modal = this.create('Confirm Action', content);
         modal.show();
     }
     
     handleConfirm() {
         console.log('handleConfirm called on instance', this._instanceId, 'callback:', this.confirmCallback);
-        if (this.confirmCallback) {
-            this.confirmCallback();
-        }
+        const callback = this.confirmCallback;
         this.close();
+        if (callback) {
+            // Execute callback after close has started
+            setTimeout(() => callback(), 50);
+        }
     }
     
     alert(message, title = 'Alert') {

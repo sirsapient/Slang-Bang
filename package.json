@@ -1,0 +1,20 @@
+{
+  "name": "slang-bang-game",
+  "version": "1.0.0",
+  "description": "A real-time drug dealing empire simulation game with a mobile-first interface. Build your criminal empire from street dealer to cartel boss while managing heat, trading drugs, and expanding your operations across major US cities.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sirsapient/Slang-Bang.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/sirsapient/Slang-Bang/issues"
+  },
+  "homepage": "https://github.com/sirsapient/Slang-Bang#readme"
+}

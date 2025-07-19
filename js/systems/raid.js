@@ -115,8 +115,22 @@ export class RaidSystem {
             return false;
         }
         
-        const guns = this.state.get('guns');
-        const successChance = this.calculateRaidSuccess(gangSize, guns, target.difficulty, target.gangSize);
+        // Check if player has enough gang members in this city
+        const availableGangInCity = this.state.getAvailableGangMembersInCity(city);
+        if (availableGangInCity < gangSize) {
+            this.events.add(`Not enough gang members in ${city} for this raid! Need ${gangSize}, have ${availableGangInCity}`, 'bad');
+            return false;
+        }
+        
+        // Check if player has enough guns in this city
+        const availableGunsInCity = this.state.getAvailableGunsInCity(city);
+        console.log(`Raid validation: gangSize=${gangSize}, availableGuns=${availableGunsInCity}`);
+        if (availableGunsInCity < gangSize) {
+            this.events.add(`Not enough guns in ${city} for this raid! Need ${gangSize} guns for ${gangSize} gang members, but only have ${availableGunsInCity} guns available.`, 'bad');
+            return false;
+        }
+        
+        const successChance = this.calculateRaidSuccess(gangSize, availableGunsInCity, target.difficulty, target.gangSize);
         const success = Math.random() < successChance;
         
         // Calculate results
@@ -132,9 +146,9 @@ export class RaidSystem {
                 this.state.updateInventory(drug, loot.drugs[drug]);
             });
             
-            // Apply gang losses
+            // Apply gang losses from the city
             if (gangLosses > 0) {
-                this.state.updateGangSize(-gangLosses);
+                this.state.removeGangMembersFromCity(city, gangLosses);
             }
             
             // Apply heat
@@ -146,7 +160,7 @@ export class RaidSystem {
             // Log results
             this.events.add(`⚔️ Raid successful! Looted $${loot.cash.toLocaleString()} and drugs`, 'good');
             if (gangLosses > 0) {
-                this.events.add(`Lost ${gangLosses} gang members in the raid`, 'bad');
+                this.events.add(`Lost ${gangLosses} gang members from ${city} in the raid`, 'bad');
             }
             this.events.add(`Heat increased by ${heatIncrease.toLocaleString()}`, 'bad');
             
@@ -161,10 +175,10 @@ export class RaidSystem {
             const failedLosses = Math.floor(gangSize * 0.6);
             const failedHeat = Math.floor(heatIncrease * 1.5);
             
-            this.state.updateGangSize(-failedLosses);
+            this.state.removeGangMembersFromCity(city, failedLosses);
             this.state.updateWarrant(failedHeat);
             
-            this.events.add(`❌ Raid failed! Lost ${failedLosses} gang members`, 'bad');
+            this.events.add(`❌ Raid failed! Lost ${failedLosses} gang members from ${city}`, 'bad');
             this.events.add(`Heat increased by ${failedHeat.toLocaleString()}`, 'bad');
             
             return {

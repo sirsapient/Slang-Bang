@@ -10,7 +10,20 @@ export class AssetsScreen {
     
     render() {
         if (!this.systems.assets.isUnlocked()) {
-            return this.renderLockedScreen();
+            // Just show a static locked message, no alert or getCurrentPlayerRank call
+            return `
+                <div class="screen-header">
+                    <button class="back-button" onclick="game.showScreen('home')">← Back</button>
+                    <h3>💎 Asset Store</h3>
+                    <div style="font-size: 12px; color: #aaa;">Locked</div>
+                </div>
+                <div style="background: #222; border: 2px solid #ff6666; border-radius: 10px; padding: 40px 20px; text-align: center; margin-top: 50px;">
+                    <div style="font-size: 48px; margin-bottom: 20px;">🔒</div>
+                    <div style="font-size: 18px; color: #ff6666; font-weight: bold; margin-bottom: 10px;">Asset Store Locked</div>
+                    <div style="font-size: 14px; color: #aaa; margin-bottom: 20px;">Assets unlock at Rank 4 (District Chief)</div>
+                    <button onclick="game.showScreen('home')" class="action-btn" style="margin-top: 30px; padding: 12px 24px;">Continue Building Empire</button>
+                </div>
+            `;
         }
         
         const summary = this.systems.assets.getAssetSummary();
@@ -419,29 +432,41 @@ export class AssetsScreen {
     }
     
     purchaseAsset(assetId) {
-        if (this.systems.assets.purchaseAsset(assetId)) {
+        const result = this.systems.assets.purchaseAsset(assetId);
+        if (result.success) {
             this.game.showScreen('assets'); // Refresh screen
+        } else if (result.error) {
+            this.ui.modals.alert(result.error, 'Purchase Failed');
         }
     }
     
     sellAsset(assetId) {
         const asset = this.state.data.assets.owned[assetId];
         if (asset && confirm(`Sell ${asset.name} for $${asset.resaleValue.toLocaleString()}?`)) {
-            if (this.systems.assets.sellAsset(assetId)) {
+            const result = this.systems.assets.sellAsset(assetId);
+            if (result.success) {
                 this.game.showScreen('assets'); // Refresh screen
+            } else if (result.error) {
+                this.ui.modals.alert(result.error, 'Sell Failed');
             }
         }
     }
     
     wearJewelry(jewelryId) {
-        if (this.systems.assets.wearJewelry(jewelryId)) {
+        const result = this.systems.assets.wearJewelry(jewelryId);
+        if (result.success) {
             this.game.showScreen('assets'); // Refresh screen
+        } else if (result.error) {
+            this.ui.modals.alert(result.error, 'Cannot Wear');
         }
     }
     
     removeJewelry(jewelryId) {
-        if (this.systems.assets.removeJewelry(jewelryId)) {
+        const result = this.systems.assets.removeJewelry(jewelryId);
+        if (result.success) {
             this.game.showScreen('assets'); // Refresh screen
+        } else if (result.error) {
+            this.ui.modals.alert(result.error, 'Cannot Remove');
         }
     }
 }

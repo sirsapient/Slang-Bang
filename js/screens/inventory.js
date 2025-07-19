@@ -9,6 +9,7 @@ export class InventoryScreen {
     
     render() {
         const cash = this.state.get('cash');
+        const safeCash = (cash !== undefined && cash !== null && !isNaN(cash)) ? cash : 0;
         const currentCity = this.state.get('currentCity');
         
         return `
@@ -23,7 +24,7 @@ export class InventoryScreen {
                     <div>
                         <div style="font-size: 12px; color: #aaa; margin-bottom: 5px;">💰 Cash</div>
                         <div style="font-size: 18px; color: #66ff66; font-weight: bold;">
-                            $${cash.toLocaleString()}
+                            $${safeCash.toLocaleString()}
                         </div>
                     </div>
                     <div>

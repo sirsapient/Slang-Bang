@@ -10,11 +10,12 @@ export class TradingScreen {
     render() {
         const currentCity = this.state.get('currentCity');
         const cash = this.state.get('cash');
+        const safeCash = (cash !== undefined && cash !== null && !isNaN(cash)) ? cash : 0;
         return `
             <div class="screen-header">
                 <button class="back-button" onclick="game.showScreen('home')">← Back</button>
                 <h3>💰 Trading - ${currentCity}</h3>
-                <div style="font-size: 12px; color: #aaa;">Cash: $${cash.toLocaleString()}</div>
+                <div style="font-size: 12px; color: #aaa;">Cash: $${safeCash.toLocaleString()}</div>
             </div>
             
             <div class="drug-market header">
@@ -49,20 +50,22 @@ export class TradingScreen {
             
             content += `
                 <div class="drug-market">
-                    <div>${drug} (${supply})</div>
+                    <div>${drug} (${Math.floor(supply)})</div>
                     <div style="color: #66ff66">$${price.toLocaleString()}</div>
-                    <div>${owned}</div>
+                    <div>${Math.floor(owned)}</div>
                     <div>
-                        <input type="number" id="buy-${drug}" value="0" min="0" max="${supply}" 
-                               oninput="game.screens.trading.updateBuyCost('${drug}')" 
+                        <input type="number" id="buy-${drug}" value="0" min="0" max="${Math.floor(supply)}" 
+                               step="1"
+                               oninput="this.value = Math.floor(Math.abs(this.value)); game.screens.trading.updateBuyCost('${drug}')" 
                                class="quantity-input" style="width: 60px;">
                         <button onclick="game.screens.trading.buyDrug('${drug}')" 
                                 ${supply === 0 ? 'disabled' : ''}>Buy</button>
                         <div id="buy-cost-${drug}" style="font-size: 10px; color: #ffff00; margin-top: 2px;"></div>
                     </div>
                     <div>
-                        <input type="number" id="sell-${drug}" value="0" min="0" max="${owned}" 
-                               oninput="game.screens.trading.updateSellValue('${drug}')" 
+                        <input type="number" id="sell-${drug}" value="0" min="0" max="${Math.floor(owned)}" 
+                               step="1"
+                               oninput="this.value = Math.floor(Math.abs(this.value)); game.screens.trading.updateSellValue('${drug}')" 
                                class="quantity-input" style="width: 60px;">
                         <button onclick="game.screens.trading.sellDrug('${drug}')" 
                                 ${owned === 0 ? 'disabled' : ''}>Sell</button>
@@ -107,7 +110,9 @@ export class TradingScreen {
         // Update header cash display
         const cashDisplay = document.querySelector('.screen-header div[style*="Cash"]');
         if (cashDisplay) {
-            cashDisplay.textContent = `Cash: $${this.state.get('cash').toLocaleString()}`;
+            const cash = this.state.get('cash');
+            const safeCash = (cash !== undefined && cash !== null && !isNaN(cash)) ? cash : 0;
+            cashDisplay.textContent = `Cash: $${safeCash.toLocaleString()}`;
         }
     }
     
@@ -150,34 +155,55 @@ export class TradingScreen {
     
     buyDrug(drug) {
         const quantity = parseInt(document.getElementById(`buy-${drug}`)?.value) || 0;
-        const supply = this.systems.trading.getCurrentCitySupply(drug);
-        if (quantity > supply) {
-            this.ui.modals.alert('Not enough for your order', 'Order Error');
-            return;
-        }
-        if (this.systems.trading.buyDrug(drug, quantity)) {
+        const result = this.systems.trading.buyDrug(drug, quantity);
+        if (result.success) {
             document.getElementById(`buy-${drug}`).value = '0';
             this.updateBuyCost(drug);
             this.refresh();
+        } else if (result.error) {
+            this.ui.modals.alert(result.error, 'Order Error');
         }
     }
     
     sellDrug(drug) {
         const quantity = parseInt(document.getElementById(`sell-${drug}`)?.value) || 0;
-        
-        if (this.systems.trading.sellDrug(drug, quantity)) {
+        const result = this.systems.trading.sellDrug(drug, quantity);
+        if (result.success) {
             document.getElementById(`sell-${drug}`).value = '0';
             this.updateSellValue(drug);
             this.refresh();
+        } else if (result.error) {
+            this.ui.modals.alert(result.error, 'Sell Error');
         }
     }
     
     sellAllDrugs() {
+        // Build itemized list
+        const inventory = this.state.get('inventory');
+        const prices = this.systems.trading.getCurrentCityPrices();
+        let total = 0;
+        let itemList = '';
+        Object.keys(this.game.data.drugs).forEach(drug => {
+            const qty = inventory[drug] || 0;
+            const price = prices[drug] || 0;
+            if (qty > 0) {
+                const value = qty * price;
+                total += value;
+                itemList += `<div style=\"display:flex;justify-content:space-between;margin-bottom:4px;\"><span>${drug}:</span> <span>${qty} x $${price.toLocaleString()} = <b>$${value.toLocaleString()}</b></span></div>`;
+            }
+        });
+        if (!itemList) {
+            itemList = '<div style="color:#aaa;">You have no drugs to sell.</div>';
+        }
+        const message = `Sell all drugs in your inventory at current prices?<br><br>${itemList}<br><div style=\"margin-top:10px;font-weight:bold;\">Total: $${total.toLocaleString()}</div>`;
         this.ui.modals.confirm(
-            'Sell all drugs in your inventory at current prices?',
+            message,
             () => {
-                if (this.systems.trading.sellAllDrugs()) {
+                const result = this.systems.trading.sellAllDrugs();
+                if (result.success) {
                     this.refresh();
+                } else if (result.error) {
+                    this.ui.modals.alert(result.error, 'Sell All Error');
                 }
             },
             null
