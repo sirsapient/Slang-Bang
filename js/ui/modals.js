@@ -50,12 +50,8 @@ export class ModalManager {
     }
     
     show(modal) {
-        // Prevent multiple rapid show calls
-        if (this.isShowing) {
-            console.log('Modal already showing, ignoring duplicate call');
-            return;
-        }
-        
+        // Allow showing new modals even if one is already showing
+        // This enables confirmation modals to work properly
         this.isShowing = true;
         
         // Always re-append the container if it was removed
@@ -267,7 +263,6 @@ export class ModalManager {
     
     close() {
         console.log('close() called on instance', this._instanceId, 'activeModal:', this.activeModal);
-        console.trace(); // Print the call stack for debugging
         
         // Prevent rapid closing
         if (this.isClosing) {

@@ -244,29 +244,25 @@ export class HomeScreen {
             return;
         }
         
-        console.log('Showing confirmation modal for guns...');
+        // Check if we can afford it first
+        if (!this.state.canAfford(cost)) {
+            this.ui.modals.alert('Not enough cash for this purchase!', 'Purchase Failed');
+            return;
+        }
         
-        // Show confirm modal directly without closing first
-        this.ui.modals.confirm(
-            `Buy ${quantity} guns in ${currentCity} for $${cost.toLocaleString()}?`,
-            () => {
-                console.log('Gun purchase confirmed!');
-                if (this.state.canAfford(cost)) {
-                    console.log('Can afford, processing purchase...');
-                    this.state.updateCash(-cost);
-                    this.state.addGunsToCity(currentCity, quantity);
-                    this.ui.events.add(`Purchased ${quantity} guns in ${currentCity} for $${cost.toLocaleString()}`, 'good');
-                    this.refreshQuickBuyModal();
-                    console.log('Gun purchase completed successfully');
-                } else {
-                    console.log('Cannot afford guns');
-                    this.ui.modals.alert('Not enough cash for this purchase!', 'Purchase Failed');
-                }
-            },
-            () => {
-                console.log('Gun purchase cancelled');
-            }
-        );
+        // Use a simple confirmation with alert instead of modal
+        const confirmed = confirm(`Buy ${quantity} guns in ${currentCity} for $${cost.toLocaleString()}?`);
+        
+        if (confirmed) {
+            console.log('Gun purchase confirmed!');
+            this.state.updateCash(-cost);
+            this.state.addGunsToCity(currentCity, quantity);
+            this.ui.events.add(`Purchased ${quantity} guns in ${currentCity} for $${cost.toLocaleString()}`, 'good');
+            this.refreshQuickBuyModal();
+            console.log('Gun purchase completed successfully');
+        } else {
+            console.log('Gun purchase cancelled');
+        }
     }
     
     quickBuyGang() {
@@ -283,31 +279,27 @@ export class HomeScreen {
             return;
         }
         
-        console.log('Showing confirmation modal for gang members...');
+        // Check if we can afford it first
+        if (!this.state.canAfford(cost)) {
+            this.ui.modals.alert('Not enough cash for this purchase!', 'Purchase Failed');
+            return;
+        }
         
-        // Show confirm modal directly without closing first
-        this.ui.modals.confirm(
-            `Recruit ${quantity} gang members in ${currentCity} for $${cost.toLocaleString()}?<br><small>Heat will increase by ${heat.toLocaleString()}</small>`,
-            () => {
-                console.log('Gang member purchase confirmed!');
-                if (this.state.canAfford(cost)) {
-                    console.log('Can afford, processing purchase...');
-                    this.state.updateCash(-cost);
-                    this.state.addGangMembers(currentCity, quantity);
-                    this.state.updateWarrant(heat);
-                    this.ui.events.add(`Recruited ${quantity} gang members in ${currentCity} for $${cost.toLocaleString()}`, 'good');
-                    this.ui.events.add(`Gang recruitment increased heat by ${heat.toLocaleString()}`, 'bad');
-                    this.refreshQuickBuyModal();
-                    console.log('Gang member purchase completed successfully');
-                } else {
-                    console.log('Cannot afford gang members');
-                    this.ui.modals.alert('Not enough cash for this purchase!', 'Purchase Failed');
-                }
-            },
-            () => {
-                console.log('Gang member purchase cancelled');
-            }
-        );
+        // Use a simple confirmation with alert instead of modal
+        const confirmed = confirm(`Recruit ${quantity} gang members in ${currentCity} for $${cost.toLocaleString()}?\n\nHeat will increase by ${heat.toLocaleString()}`);
+        
+        if (confirmed) {
+            console.log('Gang member purchase confirmed!');
+            this.state.updateCash(-cost);
+            this.state.addGangMembers(currentCity, quantity);
+            this.state.updateWarrant(heat);
+            this.ui.events.add(`Recruited ${quantity} gang members in ${currentCity} for $${cost.toLocaleString()}`, 'good');
+            this.ui.events.add(`Gang recruitment increased heat by ${heat.toLocaleString()}`, 'bad');
+            this.refreshQuickBuyModal();
+            console.log('Gang member purchase completed successfully');
+        } else {
+            console.log('Gang member purchase cancelled');
+        }
     }
     
     refreshQuickBuyModal() {
