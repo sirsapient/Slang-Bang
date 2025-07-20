@@ -202,10 +202,28 @@ class Game {
 
 // Initialize game when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
-    const game = new Game();
-    window.game = game;
-    game.init().catch(error => {
-        console.error('Failed to initialize game:', error);
-        alert('Failed to initialize game. Please refresh the page.');
-    });
+    console.log('DOM loaded, initializing game...');
+    try {
+        const game = new Game();
+        window.game = game;
+        game.init().catch(error => {
+            console.error('Failed to initialize game:', error);
+            document.getElementById('screenContainer').innerHTML = `
+                <div style="color: #ff0000; padding: 20px; text-align: center;">
+                    <h2>Game Loading Error</h2>
+                    <p>Failed to initialize game. Please check the console for details.</p>
+                    <p>Error: ${error.message}</p>
+                </div>
+            `;
+        });
+    } catch (error) {
+        console.error('Critical error during game initialization:', error);
+        document.getElementById('screenContainer').innerHTML = `
+            <div style="color: #ff0000; padding: 20px; text-align: center;">
+                <h2>Critical Error</h2>
+                <p>Failed to create game instance.</p>
+                <p>Error: ${error.message}</p>
+            </div>
+        `;
+    }
 });
