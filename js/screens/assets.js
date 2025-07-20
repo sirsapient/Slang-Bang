@@ -212,38 +212,45 @@ export class AssetsScreen {
         `;
         
         jewelry.forEach(item => {
-            const isOwned = owned[item.id];
-            const isWorn = wearing.includes(item.id);
+            const ownedInstances = owned[item.id] || [];
+            const ownedCount = ownedInstances.length;
+            const isWorn = wearing.some(instanceId => {
+                const instance = this.systems.assets.findAssetByInstanceId(instanceId);
+                return instance && instance.id === item.id;
+            });
             
             content += `
-                <div class="market-item" style="${isOwned ? 'border: 2px solid #66ff66;' : ''}">
+                <div class="market-item" style="${ownedCount > 0 ? 'border: 2px solid #66ff66;' : ''}">
                     <div class="market-header">
                         <div class="drug-name">
                             ${item.name}
-                            ${isOwned ? ' ✅' : ''}
+                            ${ownedCount > 0 ? ` ✅ (${ownedCount})` : ''}
                             ${isWorn ? ' 👤' : ''}
                         </div>
                         <div class="drug-price">
-                            ${isOwned ? `💰 $${item.resaleValue.toLocaleString()}` : `$${item.cost.toLocaleString()}`}
+                            ${ownedCount > 0 ? `💰 $${item.resaleValue.toLocaleString()}` : `$${item.cost.toLocaleString()}`}
                         </div>
                     </div>
                     <div style="font-size: 12px; color: #aaa; margin: 8px 0;">
                         ${item.description} • ⭐ +${item.flexScore} Flex
                     </div>
-                    ${isOwned ? `
-                        <div style="display: grid; grid-template-columns: ${isWorn ? '1fr 1fr' : '1fr 1fr'}; gap: 8px;">
+                    ${ownedCount > 0 ? `
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
                             ${!isWorn ? `
-                                <button onclick="game.screens.assets.wearJewelry('${item.id}')" 
+                                <button onclick="game.screens.assets.wearJewelry('${ownedInstances[0].instanceId}')" 
                                         class="action-btn" style="padding: 6px; font-size: 11px;">
                                     👤 Wear
                                 </button>
                             ` : `
-                                <button onclick="game.screens.assets.removeJewelry('${item.id}')" 
+                                <button onclick="game.screens.assets.removeJewelry('${wearing.find(id => {
+                                    const instance = this.systems.assets.findAssetByInstanceId(id);
+                                    return instance && instance.id === item.id;
+                                })}')" 
                                         class="action-btn" style="padding: 6px; font-size: 11px; background: #666;">
                                     Remove
                                 </button>
                             `}
-                            <button onclick="game.screens.assets.sellAsset('${item.id}')" 
+                            <button onclick="game.screens.assets.sellAsset('${ownedInstances[0].instanceId}')" 
                                     class="action-btn sell" style="padding: 6px; font-size: 11px;">
                                 💰 Sell
                             </button>
@@ -266,7 +273,12 @@ export class AssetsScreen {
         const cars = this.systems.assets.getAssetsByType('car');
         const owned = this.systems.assets.getOwnedAssets('car');
         const capacity = this.systems.assets.getStorageCapacity();
-        const ownedCount = Object.keys(owned).length;
+        
+        // Count total owned cars
+        let totalOwnedCars = 0;
+        Object.values(owned).forEach(instances => {
+            totalOwnedCars += instances.length;
+        });
         
         let content = '';
         
@@ -286,31 +298,32 @@ export class AssetsScreen {
             content += `
                 <div style="background: #1a1a1a; padding: 10px; border-radius: 8px; margin-bottom: 15px; 
                             text-align: center; font-size: 12px; color: #ffff00;">
-                    Car Storage: ${ownedCount}/${capacity.cars} cars
+                    Car Storage: ${totalOwnedCars}/${capacity.cars} cars
                 </div>
             `;
         }
         
         cars.forEach(item => {
-            const isOwned = owned[item.id];
-            const canBuy = capacity.cars > 0 && ownedCount < capacity.cars;
+            const ownedInstances = owned[item.id] || [];
+            const ownedCount = ownedInstances.length;
+            const canBuy = capacity.cars > 0 && totalOwnedCars < capacity.cars;
             
             content += `
-                <div class="market-item" style="${isOwned ? 'border: 2px solid #66ff66;' : ''}">
+                <div class="market-item" style="${ownedCount > 0 ? 'border: 2px solid #66ff66;' : ''}">
                     <div class="market-header">
                         <div class="drug-name">
                             ${item.name}
-                            ${isOwned ? ' ✅' : ''}
+                            ${ownedCount > 0 ? ` ✅ (${ownedCount})` : ''}
                         </div>
                         <div class="drug-price">
-                            ${isOwned ? `💰 $${item.resaleValue.toLocaleString()}` : `$${item.cost.toLocaleString()}`}
+                            ${ownedCount > 0 ? `💰 $${item.resaleValue.toLocaleString()}` : `$${item.cost.toLocaleString()}`}
                         </div>
                     </div>
                     <div style="font-size: 12px; color: #aaa; margin: 8px 0;">
                         ${item.description} • ⭐ +${item.flexScore} Flex
                     </div>
-                    ${isOwned ? `
-                        <button onclick="game.screens.assets.sellAsset('${item.id}')" 
+                    ${ownedCount > 0 ? `
+                        <button onclick="game.screens.assets.sellAsset('${ownedInstances[0].instanceId}')" 
                                 class="action-btn sell" style="width: 100%; padding: 8px;">
                             💰 Sell Car
                         </button>
@@ -340,17 +353,18 @@ export class AssetsScreen {
         `;
         
         properties.forEach(item => {
-            const isOwned = owned[item.id];
+            const ownedInstances = owned[item.id] || [];
+            const ownedCount = ownedInstances.length;
             
             content += `
-                <div class="market-item" style="${isOwned ? 'border: 2px solid #66ff66;' : ''}">
+                <div class="market-item" style="${ownedCount > 0 ? 'border: 2px solid #66ff66;' : ''}">
                     <div class="market-header">
                         <div class="drug-name">
                             ${item.name}
-                            ${isOwned ? ' ✅' : ''}
+                            ${ownedCount > 0 ? ` ✅ (${ownedCount})` : ''}
                         </div>
                         <div class="drug-price">
-                            ${isOwned ? `💰 $${item.resaleValue.toLocaleString()}` : `$${item.cost.toLocaleString()}`}
+                            ${ownedCount > 0 ? `💰 $${item.resaleValue.toLocaleString()}` : `$${item.cost.toLocaleString()}`}
                         </div>
                     </div>
                     <div style="font-size: 12px; color: #aaa; margin: 8px 0;">
@@ -360,8 +374,8 @@ export class AssetsScreen {
                                 font-size: 11px; color: #ffff00;">
                         Storage: 💍 ${item.capacity.jewelry} jewelry • 🚗 ${item.capacity.cars} cars
                     </div>
-                    ${isOwned ? `
-                        <button onclick="game.screens.assets.sellAsset('${item.id}')" 
+                    ${ownedCount > 0 ? `
+                        <button onclick="game.screens.assets.sellAsset('${ownedInstances[0].instanceId}')" 
                                 class="action-btn sell" style="width: 100%; padding: 8px;">
                             💰 Sell Property
                         </button>
@@ -380,10 +394,10 @@ export class AssetsScreen {
     }
     
     renderOwnedTab() {
-        const owned = this.systems.assets.getOwnedAssets();
+        const allInstances = this.systems.assets.getAllOwnedInstances();
         const wearing = this.systems.assets.getWornJewelry();
         
-        if (Object.keys(owned).length === 0) {
+        if (allInstances.length === 0) {
             return `
                 <div style="background: #222; border: 1px solid #444; border-radius: 10px; 
                             padding: 40px; text-align: center;">
@@ -406,11 +420,11 @@ export class AssetsScreen {
         
         // Group by type
         const grouped = { jewelry: [], cars: [], property: [], exclusive: [] };
-        Object.values(owned).forEach(asset => {
-            if (asset.exclusive) {
-                grouped.exclusive.push(asset);
-            } else if (grouped[asset.type]) {
-                grouped[asset.type].push(asset);
+        allInstances.forEach(instance => {
+            if (instance.exclusive) {
+                grouped.exclusive.push(instance);
+            } else if (grouped[instance.type]) {
+                grouped[instance.type].push(instance);
             }
         });
         
@@ -422,12 +436,12 @@ export class AssetsScreen {
                 
                 content += `
                     <div style="margin-bottom: 20px;">
-                        <h5 style="color: #aaa; margin-bottom: 10px;">${typeEmoji} ${typeName}</h5>
+                        <h5 style="color: #aaa; margin-bottom: 10px;">${typeEmoji} ${typeName} (${grouped[type].length})</h5>
                 `;
                 
-                grouped[type].forEach(asset => {
-                    const isWorn = wearing.includes(asset.id);
-                    const isExclusive = asset.exclusive;
+                grouped[type].forEach(instance => {
+                    const isWorn = wearing.includes(instance.instanceId);
+                    const isExclusive = instance.exclusive;
                     
                     content += `
                         <div style="background: #222; border: 1px solid ${isExclusive ? '#ffaa00' : '#444'}; border-radius: 8px; 
@@ -435,21 +449,40 @@ export class AssetsScreen {
                             <div style="display: flex; justify-content: space-between; align-items: center;">
                                 <div>
                                     <div style="font-weight: bold; color: #fff;">
-                                        ${asset.name} ${isWorn ? '👤' : ''} ${isExclusive ? '🌟' : ''}
+                                        ${instance.name} ${isWorn ? '👤' : ''} ${isExclusive ? '🌟' : ''}
                                     </div>
                                     <div style="font-size: 11px; color: #aaa;">
-                                        Bought Day ${asset.purchaseDate} • ⭐ +${asset.flexScore} Flex
-                                        ${isExclusive ? ` • Purchased in ${asset.cityPurchased}` : ''}
+                                        Bought Day ${instance.purchaseDate} • ⭐ +${instance.flexScore} Flex
+                                        ${isExclusive ? ` • Purchased in ${instance.cityPurchased}` : ''}
                                     </div>
                                 </div>
                                 <div style="text-align: right;">
                                     <div style="font-size: 11px; color: #66ff66;">
-                                        Sell: $${asset.resaleValue.toLocaleString()}
+                                        Sell: $${instance.resaleValue.toLocaleString()}
                                     </div>
                                     <div style="font-size: 10px; color: #aaa;">
-                                        Paid: $${asset.purchasePrice.toLocaleString()}
+                                        Paid: $${instance.purchasePrice.toLocaleString()}
                                     </div>
                                 </div>
+                            </div>
+                            <div style="margin-top: 8px; display: flex; gap: 8px;">
+                                ${instance.type === 'jewelry' ? `
+                                    ${!isWorn ? `
+                                        <button onclick="game.screens.assets.wearJewelry('${instance.instanceId}')" 
+                                                class="action-btn" style="padding: 4px 8px; font-size: 10px;">
+                                            👤 Wear
+                                        </button>
+                                    ` : `
+                                        <button onclick="game.screens.assets.removeJewelry('${instance.instanceId}')" 
+                                                class="action-btn" style="padding: 4px 8px; font-size: 10px; background: #666;">
+                                            Remove
+                                        </button>
+                                    `}
+                                ` : ''}
+                                <button onclick="game.screens.assets.sellAsset('${instance.instanceId}')" 
+                                        class="action-btn sell" style="padding: 4px 8px; font-size: 10px;">
+                                    💰 Sell
+                                </button>
                             </div>
                         </div>
                     `;
