@@ -26,7 +26,7 @@ export class TradingScreen {
                 <div>Sell</div>
             </div>
             
-            <div id="drugMarket">
+            <div id="drugMarket" style="padding-bottom: 80px;">
                 ${this.renderDrugMarket()}
             </div>
         `;

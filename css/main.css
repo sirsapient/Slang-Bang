@@ -329,6 +329,24 @@ body {
     background: rgba(255, 255, 0, 0.1); 
 }
 
+/* Notification styles */
+.notification-item {
+    transition: all 0.2s ease;
+}
+
+.notification-item:hover {
+    transform: translateX(5px);
+    border-color: #66ccff !important;
+}
+
+.notification-item.unread {
+    border-left: 3px solid #66ccff;
+}
+
+.notification-item.unread:hover {
+    background: #444 !important;
+}
+
 .nav-bar {
     background: #000;
     border-top: 2px solid #333;
@@ -533,6 +551,11 @@ button:disabled {
     display: flex;
     justify-content: space-between;
     align-items: center;
+}
+
+.modal-title {
+    flex: 1;
+    text-align: left;
 }
 
 .modal-close {

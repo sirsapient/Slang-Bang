@@ -5,7 +5,7 @@ export class AssetsScreen {
         this.state = game.state;
         this.ui = game.ui;
         this.systems = game.systems;
-        this.activeTab = 'jewelry'; // Default tab
+        this.activeTab = 'exclusive'; // Default tab - show exclusive drops first
     }
     
     render() {
@@ -62,7 +62,12 @@ export class AssetsScreen {
             </div>
             
             <!-- Tab Navigation -->
-            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 20px;">
+            <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-bottom: 20px;">
+                <button onclick="game.screens.assets.switchTab('exclusive')" 
+                        class="tab-btn ${this.activeTab === 'exclusive' ? 'active' : ''}"
+                        style="padding: 10px; border-radius: 8px; font-size: 12px;">
+                    🌟 Exclusive
+                </button>
                 <button onclick="game.screens.assets.switchTab('jewelry')" 
                         class="tab-btn ${this.activeTab === 'jewelry' ? 'active' : ''}"
                         style="padding: 10px; border-radius: 8px; font-size: 12px;">
@@ -138,6 +143,8 @@ export class AssetsScreen {
     
     renderTabContent() {
         switch (this.activeTab) {
+            case 'exclusive':
+                return this.renderExclusiveTab();
             case 'jewelry':
                 return this.renderJewelryTab();
             case 'cars':
@@ -359,18 +366,20 @@ export class AssetsScreen {
         `;
         
         // Group by type
-        const grouped = { jewelry: [], cars: [], property: [] };
+        const grouped = { jewelry: [], cars: [], property: [], exclusive: [] };
         Object.values(owned).forEach(asset => {
-            if (grouped[asset.type]) {
+            if (asset.exclusive) {
+                grouped.exclusive.push(asset);
+            } else if (grouped[asset.type]) {
                 grouped[asset.type].push(asset);
             }
         });
         
         // Render each type
-        ['jewelry', 'cars', 'property'].forEach(type => {
+        ['exclusive', 'jewelry', 'cars', 'property'].forEach(type => {
             if (grouped[type].length > 0) {
-                const typeEmoji = type === 'jewelry' ? '💍' : type === 'cars' ? '🚗' : '🏠';
-                const typeName = type.charAt(0).toUpperCase() + type.slice(1);
+                const typeEmoji = type === 'exclusive' ? '🌟' : type === 'jewelry' ? '💍' : type === 'cars' ? '🚗' : '🏠';
+                const typeName = type === 'exclusive' ? 'Exclusive' : type.charAt(0).toUpperCase() + type.slice(1);
                 
                 content += `
                     <div style="margin-bottom: 20px;">
@@ -379,17 +388,19 @@ export class AssetsScreen {
                 
                 grouped[type].forEach(asset => {
                     const isWorn = wearing.includes(asset.id);
+                    const isExclusive = asset.exclusive;
                     
                     content += `
-                        <div style="background: #222; border: 1px solid #444; border-radius: 8px; 
+                        <div style="background: #222; border: 1px solid ${isExclusive ? '#ffaa00' : '#444'}; border-radius: 8px; 
                                     padding: 12px; margin-bottom: 10px;">
                             <div style="display: flex; justify-content: space-between; align-items: center;">
                                 <div>
                                     <div style="font-weight: bold; color: #fff;">
-                                        ${asset.name} ${isWorn ? '👤' : ''}
+                                        ${asset.name} ${isWorn ? '👤' : ''} ${isExclusive ? '🌟' : ''}
                                     </div>
                                     <div style="font-size: 11px; color: #aaa;">
                                         Bought Day ${asset.purchaseDate} • ⭐ +${asset.flexScore} Flex
+                                        ${isExclusive ? ` • Purchased in ${asset.cityPurchased}` : ''}
                                     </div>
                                 </div>
                                 <div style="text-align: right;">
@@ -407,6 +418,85 @@ export class AssetsScreen {
                 
                 content += `</div>`;
             }
+        });
+        
+        return content;
+    }
+    
+    renderExclusiveTab() {
+        const currentCity = this.state.get('currentCity');
+        const cityDrops = this.systems.assetDrop.getCityDrops(currentCity);
+        
+        if (!cityDrops || cityDrops.length === 0) {
+            return `
+                <div style="background: #222; border: 1px solid #444; border-radius: 10px; 
+                            padding: 40px; text-align: center;">
+                    <div style="font-size: 48px; margin-bottom: 15px;">📦</div>
+                    <div style="font-size: 16px; color: #aaa;">
+                        No exclusive items in ${currentCity} right now
+                    </div>
+                    <div style="font-size: 12px; color: #666; margin-top: 10px;">
+                        Check back soon or travel to another city!
+                    </div>
+                </div>
+            `;
+        }
+        
+        let content = `
+            <div style="background: #1a1a1a; padding: 10px; border-radius: 8px; margin-bottom: 15px; 
+                        text-align: center; font-size: 12px; color: #ffaa00;">
+                🌟 ${currentCity} Exclusive Items - Limited Supply!
+            </div>
+        `;
+        
+        cityDrops.forEach(drop => {
+            const currentPrice = this.systems.assetDrop.calculateDynamicPrice(drop);
+            const soldOut = drop.remaining === 0;
+            const lowStock = drop.remaining < 10 && drop.remaining > 0;
+            
+            content += `
+                <div class="market-item" style="border: 2px solid ${soldOut ? '#666' : '#ffaa00'}; 
+                                               ${soldOut ? 'opacity: 0.7;' : ''}">
+                    <div class="market-header">
+                        <div class="drug-name">
+                            ${drop.name}
+                            ${soldOut ? ' ❌ SOLD OUT' : ''}
+                        </div>
+                        <div class="drug-price">
+                            $${currentPrice.toLocaleString()}
+                        </div>
+                    </div>
+                    <div style="font-size: 12px; color: #aaa; margin: 8px 0;">
+                        ${drop.description} • ⭐ +${drop.baseFlexScore} Flex
+                    </div>
+                    <div style="background: #333; padding: 10px; border-radius: 5px; margin: 8px 0;">
+                        <div style="display: flex; justify-content: space-between; font-size: 11px;">
+                            <span style="color: ${lowStock ? '#ff6666' : '#ffaa00'};">
+                                ${drop.remaining}/${drop.totalSupply} available
+                            </span>
+                            <span style="color: #666;">
+                                Expires: ${this.systems.assetDrop.getTimeRemaining(drop.expiresAt)}
+                            </span>
+                        </div>
+                        ${drop.currentPrice > drop.baseCost ? `
+                            <div style="font-size: 10px; color: #ff6666; margin-top: 5px;">
+                                Price increased ${Math.round((currentPrice / drop.baseCost - 1) * 100)}% due to demand!
+                            </div>
+                        ` : ''}
+                    </div>
+                    ${!soldOut ? `
+                        <button onclick="game.screens.assets.purchaseExclusive('${drop.id}')" 
+                                class="action-btn" style="width: 100%; padding: 8px;"
+                                ${this.state.get('cash') < currentPrice ? 'disabled' : ''}>
+                            🛒 Purchase Exclusive
+                        </button>
+                    ` : `
+                        <div style="text-align: center; padding: 8px; color: #666; font-weight: bold;">
+                            SOLD OUT
+                        </div>
+                    `}
+                </div>
+            `;
         });
         
         return content;
@@ -468,5 +558,40 @@ export class AssetsScreen {
         } else if (result.error) {
             this.ui.modals.alert(result.error, 'Cannot Remove');
         }
+    }
+    
+    purchaseExclusive(dropId) {
+        // Get the drop details for confirmation
+        const currentCity = this.state.get('currentCity');
+        const cityDrops = this.systems.assetDrop.getCityDrops(currentCity);
+        const drop = cityDrops?.find(d => d.id === dropId);
+        
+        if (!drop) {
+            this.ui.modals.alert('Item not found', 'Purchase Failed');
+            return;
+        }
+        
+        const currentPrice = this.systems.assetDrop.calculateDynamicPrice(drop);
+        
+        // Show confirmation popup
+        this.ui.modals.confirm(
+            `Purchase exclusive item "${drop.name}" for $${currentPrice.toLocaleString()}?<br><br>` +
+            `<small>• Flex Score: +${drop.baseFlexScore}<br>` +
+            `• Remaining: ${drop.remaining}/${drop.totalSupply}<br>` +
+            `• Expires: ${this.systems.assetDrop.getTimeRemaining(drop.expiresAt)}</small>`,
+            () => {
+                // User confirmed purchase
+                const result = this.systems.assetDrop.purchaseExclusiveDrop(dropId);
+                if (result.success) {
+                    this.game.showScreen('assets'); // Refresh screen
+                } else if (result.error) {
+                    this.ui.modals.alert(result.error, 'Purchase Failed');
+                }
+            },
+            () => {
+                // User cancelled purchase
+                console.log('Exclusive item purchase cancelled');
+            }
+        );
     }
 }

@@ -68,20 +68,39 @@ export class TradingSystem {
      * Restock city drug supplies.
      */
     restockCitySupplies() {
+        // Track restocked drugs for consolidated notification
+        const restockedDrugs = {};
+        
         Object.keys(this.state.data.citySupply).forEach(city => {
+            restockedDrugs[city] = [];
+            
             Object.keys(this.state.data.citySupply[city]).forEach(drug => {
                 const currentSupply = this.state.data.citySupply[city][drug];
                 if (currentSupply < 20) {
                     const restockAmount = Math.floor(10 + Math.random() * 20);
                     this.state.data.citySupply[city][drug] = Math.min(200, currentSupply + restockAmount);
-                    if (currentSupply === 0 && city === this.state.get('currentCity')) {
-                        this.events.add(`📦 ${drug} supply restocked in ${city} (+${restockAmount})`, 'neutral');
+                    if (currentSupply === 0) {
+                        restockedDrugs[city].push({ drug, amount: restockAmount });
                     }
                 } else if (currentSupply < 50) {
                     const restockAmount = Math.floor(5 + Math.random() * 10);
                     this.state.data.citySupply[city][drug] = Math.min(200, currentSupply + restockAmount);
                 }
             });
+        });
+        
+        // Show consolidated restock notifications
+        Object.keys(restockedDrugs).forEach(city => {
+            const drugs = restockedDrugs[city];
+            if (drugs.length > 0) {
+                if (city === this.state.get('currentCity')) {
+                    this.showConsolidatedRestockNotification(city, drugs);
+                } else {
+                    // Just add to event log for other cities
+                    const drugList = drugs.map(d => `${d.drug} (+${d.amount})`).join(', ');
+                    this.events.add(`📦 Drug supply restocked in ${city}: ${drugList}`, 'neutral');
+                }
+            }
         });
     }
 
@@ -109,10 +128,15 @@ export class TradingSystem {
         this.state.updateInventory(drug, quantity);
         this.state.data.citySupply[city][drug] -= quantity;
         this.events.add(`Bought ${quantity} ${drug} for ${formatCurrency(totalCost)}`, 'good');
+        
+        // Add notification for successful purchase
+        this.state.addNotification(`Bought ${quantity} ${drug} for ${formatCurrency(totalCost)}`, 'success');
+        
         if (quantity >= 10) {
             const warrantIncrease = Math.floor(quantity * 50);
             this.state.updateWarrant(warrantIncrease);
             this.events.add(`Large purchase increased heat by ${formatNumber(warrantIncrease)}`, 'bad');
+            this.state.addNotification(`Large purchase increased heat by ${formatNumber(warrantIncrease)}`, 'warning');
         }
         return { success: true };
     }
@@ -137,6 +161,10 @@ export class TradingSystem {
         this.state.updateCash(totalEarned);
         this.state.updateInventory(drug, -quantity);
         this.events.add(`Sold ${quantity} ${drug} for ${formatCurrency(totalEarned)}`, 'good');
+        
+        // Add notification for successful sale
+        this.state.addNotification(`Sold ${quantity} ${drug} for ${formatCurrency(totalEarned)}`, 'success');
+        
         return { success: true };
     }
 
@@ -161,6 +189,7 @@ export class TradingSystem {
         if (totalEarned > 0) {
             this.state.updateCash(totalEarned);
             this.events.add(`💸 Sold all drugs (${drugsSold.join(', ')}) for ${formatCurrency(totalEarned)}`, 'good');
+            this.state.addNotification(`💸 Sold all drugs for ${formatCurrency(totalEarned)}`, 'success');
             return { success: true, totalEarned, drugsSold };
         } else {
             return { success: false, error: 'No drugs to sell' };
@@ -244,5 +273,29 @@ export class TradingSystem {
         const distance = Math.abs(currentDistance - destDistance);
         const cost = this.data.config.baseTravelCost + (distance * 100);
         return Math.min(cost, this.data.config.maxTravelCost);
+    }
+    
+    /**
+     * Show consolidated restock notification for a city
+     * @param {string} city
+     * @param {Array} drugs
+     */
+    showConsolidatedRestockNotification(city, drugs) {
+        if (drugs.length === 0) return;
+        
+        if (window.game && window.game.ui && window.game.ui.modals) {
+            let content = `📦 Drug supply restocked in ${city}!<br><br>`;
+            
+            drugs.forEach((item, index) => {
+                content += `<strong>${item.drug}</strong>: +${item.amount} units<br>`;
+            });
+            
+            content += `<br>Check the Trading screen to purchase!`;
+            
+            window.game.ui.modals.alert(
+                content,
+                `📦 ${drugs.length} Drug${drugs.length > 1 ? 's' : ''} Restocked!`
+            );
+        }
     }
 }

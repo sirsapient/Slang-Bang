@@ -102,6 +102,9 @@ export class GangScreen {
                 </div>
             </div>
 
+            <!-- Gang Transfer Section -->
+            ${this.renderGangTransferSection()}
+            
             <!-- Gang Members List -->
             <div id="gangMembersList">
                 ${this.renderGangMembersList()}
@@ -111,13 +114,45 @@ export class GangScreen {
     
     onShow() {
         this.updateRecruitmentCost();
+        this.updateTransferCost();
+        
+        // Add event listener for transfer button as backup
+        const transferBtn = document.getElementById('transferGangBtn');
+        if (transferBtn) {
+            transferBtn.addEventListener('click', () => {
+                console.log('Transfer button clicked via event listener');
+                this.transferGangMembers();
+            });
+        }
     }
     
     calculateGangMemberCost() {
-        const baseCost = this.game.data.config.baseGangCost;
-        const cityModifier = this.game.data.cities[this.state.get('currentCity')].heatModifier;
-        const gangModifier = 1 + (this.state.get('gangSize') * this.game.data.config.gangCostScaling);
-        return Math.floor(baseCost * cityModifier * gangModifier);
+        const baseCost = this.game.data.config.baseGangCost || 10000;
+        const currentCity = this.state.get('currentCity');
+        const cityData = this.game.data.cities[currentCity];
+        const cityModifier = cityData?.heatModifier || 1.0;
+        const gangSize = this.state.get('gangSize') || 0;
+        const gangCostScaling = this.game.data.config.gangCostScaling || 0.1;
+        const gangModifier = 1 + (gangSize * gangCostScaling);
+        
+        const cost = Math.floor(baseCost * cityModifier * gangModifier);
+        
+        // Cap the price at 40,000
+        const cappedCost = Math.min(cost, 40000);
+        
+        // Debug logging
+        console.log('Gang cost calculation:', {
+            baseCost,
+            currentCity,
+            cityModifier,
+            gangSize,
+            gangCostScaling,
+            gangModifier,
+            calculatedCost: cost,
+            cappedCost: cappedCost
+        });
+        
+        return cappedCost;
     }
     
     updateRecruitmentCost() {
@@ -187,24 +222,37 @@ export class GangScreen {
         const costPerMember = this.calculateGangMemberCost();
         const totalCost = costPerMember * quantity;
         const currentCity = this.state.get('currentCity');
+        const heatIncrease = quantity * this.game.data.config.gangRecruitHeat;
         
-        if (this.state.canAfford(totalCost)) {
-            this.state.updateCash(-totalCost);
-            this.state.addGangMembers(currentCity, quantity);
-            
-            // Add heat
-            const heatIncrease = quantity * this.game.data.config.gangRecruitHeat;
-            this.state.updateWarrant(heatIncrease);
-            
-            this.ui.events.add(`Recruited ${quantity} gang members in ${currentCity} for $${totalCost.toLocaleString()}`, 'good');
-            this.ui.events.add(`Gang recruitment increased heat by ${heatIncrease.toLocaleString()}`, 'bad');
-            
-            // Reset form and refresh
-            document.getElementById('gangRecruitCount').value = '1';
-            this.game.showScreen('gang'); // Refresh screen
-        } else {
+        if (!this.state.canAfford(totalCost)) {
             this.ui.events.add(`Not enough cash to recruit ${quantity} gang members`, 'bad');
+            return;
         }
+        
+        // Show confirmation popup
+        this.ui.modals.confirm(
+            `Recruit ${quantity} gang members in ${currentCity}?<br><br>` +
+            `<strong>Cost:</strong> $${totalCost.toLocaleString()}<br>` +
+            `<strong>Cost per member:</strong> $${costPerMember.toLocaleString()}<br>` +
+            `<strong>Heat increase:</strong> +${heatIncrease.toLocaleString()}<br>` +
+            `<strong>New gang size:</strong> ${this.state.get('gangSize') + quantity}<br><br>` +
+            `This will increase your daily heat generation.`,
+            () => {
+                this.state.updateCash(-totalCost);
+                this.state.addGangMembers(currentCity, quantity);
+                
+                // Add heat
+                this.state.updateWarrant(heatIncrease);
+                
+                this.ui.events.add(`Recruited ${quantity} gang members in ${currentCity} for $${totalCost.toLocaleString()}`, 'good');
+                this.ui.events.add(`Gang recruitment increased heat by ${heatIncrease.toLocaleString()}`, 'bad');
+                
+                // Reset form and refresh
+                document.getElementById('gangRecruitCount').value = '1';
+                this.game.showScreen('gang'); // Refresh screen
+            },
+            null
+        );
     }
     
     renderGangMembersList() {
@@ -229,7 +277,8 @@ export class GangScreen {
         }
         
         // Calculate gang statistics
-        const dailyHeatGeneration = gangSize * this.game.data.config.gangHeatPerMember;
+        const gangHeatPerMember = this.game.data.config.gangHeatPerMember || 10;
+        const dailyHeatGeneration = gangSize * gangHeatPerMember;
         const costPerMember = this.calculateGangMemberCost();
         const totalValue = gangSize * (costPerMember * 0.7); // Resale value is 70%
         
@@ -341,5 +390,179 @@ export class GangScreen {
         }
         
         return content;
+    }
+    
+    renderGangTransferSection() {
+        const gangMembers = this.state.data.gangMembers || {};
+        const citiesWithGang = Object.keys(gangMembers).filter(city => gangMembers[city] > 0);
+        const allCities = Object.keys(this.game.data.cities);
+        
+        if (citiesWithGang.length <= 1) {
+            return `
+                <div style="background: #222; border: 1px solid #444; border-radius: 10px; 
+                            padding: 15px; margin-bottom: 20px;">
+                    <div style="font-size: 14px; color: #aaa; text-align: center;">
+                        🔄 Transfer Gang Members
+                    </div>
+                    <div style="font-size: 12px; color: #666; text-align: center; margin-top: 5px;">
+                        Recruit gang members in multiple cities to enable transfers
+                    </div>
+                </div>
+            `;
+        }
+        
+        return `
+            <div style="background: #222; border: 1px solid #444; border-radius: 10px; 
+                        padding: 15px; margin-bottom: 20px;">
+                <div style="font-size: 14px; color: #ffff00; margin-bottom: 15px; text-align: center;">
+                    🔄 Transfer Gang Members
+                </div>
+                <div style="font-size: 12px; color: #aaa; margin-bottom: 10px;">
+                    Transfer gang members between cities for a travel fee
+                </div>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 10px;">
+                    <select id="transferFromCity" style="background: #333; color: #fff; border: 1px solid #666; padding: 5px; border-radius: 3px;">
+                        ${citiesWithGang.map(city => 
+                            `<option value="${city}">${city} (${this.state.getAvailableGangMembersInCity(city)} available)</option>`
+                        ).join('')}
+                    </select>
+                    <select id="transferToCity" style="background: #333; color: #fff; border: 1px solid #666; padding: 5px; border-radius: 3px;">
+                        ${allCities.map(city => 
+                            `<option value="${city}">${city}</option>`
+                        ).join('')}
+                    </select>
+                    <input type="number" id="transferAmount" value="1" min="1" max="10" 
+                           style="background: #333; color: #fff; border: 1px solid #666; padding: 5px; border-radius: 3px; text-align: center;"
+                           oninput="game.screens.gang.updateTransferCost()">
+                </div>
+                
+                <div id="transferCostDisplay" style="font-size: 12px; color: #ffff00; text-align: center; margin-bottom: 10px;">
+                    <!-- Transfer cost will appear here -->
+                </div>
+                
+                <button onclick="game.screens.gang.transferGangMembers()" class="action-btn" style="width: 100%;" id="transferGangBtn">
+                    🔄 Transfer Gang Members
+                </button>
+            </div>
+        `;
+    }
+    
+    updateTransferCost() {
+        const fromCity = document.getElementById('transferFromCity')?.value;
+        const toCity = document.getElementById('transferToCity')?.value;
+        const amount = parseInt(document.getElementById('transferAmount')?.value) || 0;
+        
+        if (!fromCity || !toCity || amount <= 0) {
+            const costDisplay = document.getElementById('transferCostDisplay');
+            if (costDisplay) {
+                costDisplay.innerHTML = '<div style="color: #666;">Enter amount to see cost</div>';
+            }
+            return;
+        }
+        
+        const transferCost = this.calculateTransferCost(fromCity, toCity, amount);
+        const costDisplay = document.getElementById('transferCostDisplay');
+        
+        if (costDisplay) {
+            costDisplay.innerHTML = `
+                <div>Transfer Cost: <span style="color: ${transferCost > this.state.get('cash') ? '#ff6666' : '#ffff00'}">
+                    $${transferCost.toLocaleString()}
+                </span></div>
+                <div style="font-size: 10px; color: #aaa; margin-top: 3px;">
+                    ${fromCity} → ${toCity} (${amount} members)
+                </div>
+            `;
+        }
+    }
+    
+    calculateTransferCost(fromCity, toCity, amount) {
+        // Base transfer cost per member
+        const baseTransferCost = this.game.data.config.baseGangCost * 0.3; // 30% of recruitment cost
+        
+        // Distance multiplier based on city distance
+        const fromDistance = this.game.data.cities[fromCity]?.distanceIndex || 0;
+        const toDistance = this.game.data.cities[toCity]?.distanceIndex || 0;
+        const distance = Math.abs(fromDistance - toDistance);
+        const distanceMultiplier = 1 + (distance * 0.1); // 10% more per distance unit
+        
+        // Heat modifier (higher heat cities cost more to transfer to)
+        const toCityHeat = this.game.data.cities[toCity]?.heatModifier || 1.0;
+        const heatMultiplier = 1 + (toCityHeat - 1) * 0.5; // 50% of heat modifier
+        
+        const totalCost = Math.floor(baseTransferCost * amount * distanceMultiplier * heatMultiplier);
+        
+        return totalCost;
+    }
+    
+    transferGangMembers() {
+        console.log('transferGangMembers called');
+        const fromCity = document.getElementById('transferFromCity')?.value;
+        const toCity = document.getElementById('transferToCity')?.value;
+        const amount = parseInt(document.getElementById('transferAmount')?.value) || 0;
+        
+        console.log('Transfer parameters:', { fromCity, toCity, amount });
+        
+        if (!fromCity || !toCity || amount <= 0) {
+            this.ui.modals.alert('Please select cities and enter a valid amount', 'Transfer Failed');
+            return;
+        }
+        
+        if (fromCity === toCity) {
+            this.ui.modals.alert('Cannot transfer to the same city', 'Transfer Failed');
+            return;
+        }
+        
+        const availableInCity = this.state.getAvailableGangMembersInCity(fromCity);
+        if (availableInCity < amount) {
+            this.ui.modals.alert(`Not enough available gang members in ${fromCity}. You have ${availableInCity} available.`, 'Transfer Failed');
+            return;
+        }
+        
+        const transferCost = this.calculateTransferCost(fromCity, toCity, amount);
+        
+        if (!this.state.canAfford(transferCost)) {
+            this.ui.modals.alert(`Not enough cash for transfer. Need $${transferCost.toLocaleString()}`, 'Transfer Failed');
+            return;
+        }
+        
+        // Show confirmation popup using the built-in confirm method
+        console.log('About to show confirmation modal');
+        const confirmMessage = `🔄 TRANSFER CONFIRMATION<br><br>` +
+            `Transfer ${amount} gang members from ${fromCity} to ${toCity}?<br><br>` +
+            `<strong>Cost:</strong> $${transferCost.toLocaleString()}<br>` +
+            `<strong>Distance:</strong> ${Math.abs(this.game.data.cities[fromCity].distanceIndex - this.game.data.cities[toCity].distanceIndex)} units<br>` +
+            `<strong>Available in ${fromCity}:</strong> ${availableInCity} members<br><br>` +
+            `This action cannot be undone.`;
+        
+        this.ui.modals.confirm(
+            confirmMessage,
+            () => {
+                console.log('Transfer confirmed, executing transfer');
+                console.log('Transfer details:', { fromCity, toCity, amount, transferCost });
+                
+                // Execute transfer
+                const removed = this.state.removeGangMembersFromCity(fromCity, amount);
+                console.log('Removed from source city:', removed);
+                
+                this.state.addGangMembers(toCity, amount);
+                console.log('Added to destination city');
+                
+                this.state.updateCash(-transferCost);
+                console.log('Updated cash');
+                
+                this.ui.events.add(`Transferred ${amount} gang members from ${fromCity} to ${toCity} for $${transferCost.toLocaleString()}`, 'good');
+                
+                // Reset form
+                document.getElementById('transferAmount').value = '1';
+                this.updateTransferCost();
+                
+                // Refresh screen
+                this.game.showScreen('gang');
+            },
+            () => {
+                console.log('Transfer cancelled');
+            }
+        );
     }
 }

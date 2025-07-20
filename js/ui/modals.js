@@ -8,6 +8,9 @@ export class ModalManager {
         this.confirmCallback = null;
         this.cancelCallback = null;
         this.promptCallback = null;
+        // Notification queue
+        this.notificationQueue = [];
+        this.notificationActive = false;
         
         // Always attach modal container to body for proper positioning
         this.container = document.body;
@@ -70,8 +73,8 @@ export class ModalManager {
         modalElement.innerHTML = `
             <div class="modal-content" style="max-width: ${modal.options.maxWidth || '500px'};">
                 <div class="modal-header">
-                    ${modal.title}
-                    <button class="modal-close">×</button>
+                    <span class="modal-title">${modal.title || ''}</span>
+                    ${modal.options.noCloseButton ? '' : '<button class="modal-close">×</button>'}
                 </div>
                 <div class="modal-body">
                     ${modal.content}
@@ -103,16 +106,48 @@ export class ModalManager {
         const cancelBtn = modalElement.querySelector('#modalCancelBtn');
         const closeBtn = modalElement.querySelector('.modal-close');
         
+        console.log('Modal buttons found:', { confirmBtn: !!confirmBtn, cancelBtn: !!cancelBtn, closeBtn: !!closeBtn });
+        console.log('Modal buttons details:', { confirmBtn, cancelBtn, closeBtn });
+        console.log('Modal HTML:', modalElement.innerHTML);
+        console.log('Confirm button found:', confirmBtn ? 'YES' : 'NO');
+        console.log('Cancel button found:', cancelBtn ? 'YES' : 'NO');
+        
         if (confirmBtn) {
+            console.log('Adding click listener to confirm button');
+            console.log('Confirm button element:', confirmBtn);
+            console.log('Confirm button style:', confirmBtn.style);
+            
+            // Test if button is clickable
+            confirmBtn.style.cursor = 'pointer';
+            confirmBtn.style.pointerEvents = 'auto';
+            
+            // Add both event listener and onclick as backup
             confirmBtn.addEventListener('click', (e) => {
+                console.log('Confirm button clicked!');
                 e.preventDefault();
                 e.stopPropagation();
                 this.handleConfirm();
             });
+            
+            // Also add a mousedown listener as backup
+            confirmBtn.addEventListener('mousedown', (e) => {
+                console.log('Confirm button mousedown!');
+            });
+            
+            // Add onclick as backup method
+            confirmBtn.onclick = (e) => {
+                console.log('Confirm button onclick!');
+                e.preventDefault();
+                e.stopPropagation();
+                this.handleConfirm();
+            };
+        } else {
+            console.log('Confirm button NOT found!');
         }
         
         if (cancelBtn) {
             cancelBtn.addEventListener('click', (e) => {
+                console.log('Cancel button clicked!');
                 e.preventDefault();
                 e.stopPropagation();
                 if (this.cancelCallback) {
@@ -151,10 +186,9 @@ export class ModalManager {
             });
         }
         
-        // Fade in effect
+                // Fade in effect
         setTimeout(() => {
             modalElement.style.opacity = '1';
-            console.log('Modal overlay style after fade-in', modalElement.style);
         }, 10);
     }
     
@@ -191,8 +225,6 @@ export class ModalManager {
     }
     
     confirm(message, onConfirm, onCancel) {
-        console.log('confirm() called on instance', this._instanceId);
-        
         // Store callbacks before creating modal
         this.confirmCallback = onConfirm;
         this.cancelCallback = onCancel;
@@ -200,22 +232,27 @@ export class ModalManager {
         const content = `
             <div style="text-align: center; padding: 20px;">
                 <p style="margin-bottom: 20px;">${message}</p>
-                <button id="modalConfirmBtn" class="action-btn" style="margin: 0 10px;">Confirm</button>
-                <button id="modalCancelBtn" class="action-btn" style="margin: 0 10px; background: #ff6666;">Cancel</button>
+                <button id="modalConfirmBtn" class="action-btn" style="margin: 0 10px; cursor: pointer;" onclick="console.log('Confirm button clicked via onclick!'); game.ui.modals.handleConfirm();">Confirm</button>
+                <button id="modalCancelBtn" class="action-btn" style="margin: 0 10px; background: #ff6666; cursor: pointer;" onclick="console.log('Cancel button clicked via onclick!'); game.ui.modals.close();">Cancel</button>
             </div>
         `;
         
-        const modal = this.create('Confirm Action', content);
-        modal.show();
+        // Create and show modal directly without using modal.show()
+        this._showModal({
+            title: 'Confirm Action',
+            content: content,
+            options: { maxWidth: '500px' }
+        });
     }
     
     handleConfirm() {
-        console.log('handleConfirm called on instance', this._instanceId, 'callback:', this.confirmCallback);
         const callback = this.confirmCallback;
         this.close();
         if (callback) {
             // Execute callback after close has started
-            setTimeout(() => callback(), 50);
+            setTimeout(() => {
+                callback();
+            }, 50);
         }
     }
     
@@ -272,6 +309,54 @@ export class ModalManager {
         const modal = this.create('', content, { maxWidth: '300px' });
         modal.show();
         
+        return modal;
+    }
+    
+    // Notification popup system with queue
+    showNotification(message, type = 'info', duration = 4000) {
+        // Add to queue
+        this.notificationQueue.push({ message, type, duration });
+        this._processNotificationQueue();
+    }
+
+    _processNotificationQueue() {
+        if (this.notificationActive || this.notificationQueue.length === 0) return;
+        this.notificationActive = true;
+        const { message, type, duration } = this.notificationQueue.shift();
+        const typeConfig = {
+            info: { icon: '📢', color: '#66ccff' },
+            success: { icon: '✅', color: '#66ff66' },
+            warning: { icon: '⚠️', color: '#ffcc66' },
+            error: { icon: '❌', color: '#ff6666' }
+        };
+        const config = typeConfig[type] || typeConfig.info;
+        const content = `
+            <div style="text-align: center; padding: 20px;">
+                <div style="font-size: 32px; margin-bottom: 10px;">${config.icon}</div>
+                <p style="color: ${config.color}; font-weight: bold; margin: 0;">${message}</p>
+            </div>
+        `;
+        // Always show close button for notifications
+        const modal = this.create('', content, { 
+            maxWidth: '400px',
+            noCloseButton: false
+        });
+        // Override close to process next notification
+        const originalClose = modal.close;
+        modal.close = () => {
+            originalClose.call(this);
+            this.notificationActive = false;
+            setTimeout(() => this._processNotificationQueue(), 100); // Small delay to avoid race
+        };
+        modal.show();
+        // Auto-close after duration unless duration is 0 (for forced interaction modals)
+        if (duration > 0) {
+            setTimeout(() => {
+                if (this.activeModal === modal) {
+                    modal.close();
+                }
+            }, duration);
+        }
         return modal;
     }
 }

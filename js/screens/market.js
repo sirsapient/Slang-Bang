@@ -40,7 +40,7 @@ export class MarketScreen {
                 </select>
             </div>
             
-            <div id="marketPricesDisplay">
+            <div id="marketPricesDisplay" style="padding-bottom: 80px;">
                 ${this.renderPrices()}
             </div>
             
@@ -56,6 +56,8 @@ export class MarketScreen {
     }
     
     onShow() {
+        // Reset selected city to current city when showing the market screen
+        this.selectedCity = this.state.get('currentCity');
         this.updateButtons();
     }
     

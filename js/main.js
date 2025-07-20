@@ -11,6 +11,7 @@ import { HeatSystem } from './systems/heat.js';
 import { TradingSystem } from './systems/trading.js';
 import { BaseSystem } from './systems/base.js';
 import { AssetSystem } from './systems/assets.js';
+import { AssetDropSystem } from './systems/assetDrop.js';
 import { EventLogger } from './ui/events.js';
 import { ModalManager } from './ui/modals.js';
 import { updatePhoneTime } from './utils.js';
@@ -19,6 +20,7 @@ import { AssetsScreen } from './screens/assets.js';
 import { TradingScreen } from './screens/trading.js';
 import { RaidSystem } from './systems/raid.js';
 import { RaidScreen } from './screens/raid.js';
+import { MailScreen } from './screens/mail.js';
 
 class Game {
     constructor() {
@@ -42,6 +44,7 @@ class Game {
         this.systems.trading = new TradingSystem(this.state, this.ui.events, this.data);
         this.systems.bases = new BaseSystem(this.state, this.ui.events, this.data);
         this.systems.assets = new AssetSystem(this.state, this.ui.events, this.data);
+        this.systems.assetDrop = new AssetDropSystem(this.state, this.ui.events, this.data);
         this.systems.raid = new RaidSystem(this.state, this.ui.events, this.data);
         
         // Initialize screens
@@ -54,6 +57,7 @@ class Game {
         this.screens.assets = new AssetsScreen(this);
         this.screens.trading = new TradingScreen(this);
         this.screens.raid = new RaidScreen(this);
+        this.screens.mail = new MailScreen(this);
         
         // Set up navigation
         this.setupNavigation();
@@ -66,9 +70,7 @@ class Game {
         if (!this.state.load()) {
             // New game - generate initial prices
             this.systems.trading.generateAllCityPrices();
-            this.ui.events.add("Welcome to Slang and Bang! Build your drug empire while time ticks away...", 'neutral');
         } else {
-            this.ui.events.add("Welcome back! Game restored from previous session.", 'good');
         }
         
         // Start game systems

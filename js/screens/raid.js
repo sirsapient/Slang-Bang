@@ -10,13 +10,8 @@ export class RaidScreen {
     }
     
     onShow() {
-        // Add event listener for execute raid button
-        const executeBtn = document.getElementById('executeRaidBtn');
-        if (executeBtn) {
-            executeBtn.addEventListener('click', () => {
-                this.executeRaid();
-            });
-        }
+        // Reset any necessary state when showing the raid screen
+        // The execute raid button uses onclick attribute, so no event listener needed
     }
     
     render() {
@@ -135,20 +130,32 @@ export class RaidScreen {
         const difficultyText = this.systems.raid.getDifficultyText(target.difficulty);
         const totalDrugs = Object.values(target.drugs).reduce((sum, count) => sum + count, 0);
         
+        // Check if target is on cooldown
+        const currentTime = Date.now();
+        const cooldownPeriod = 5 * 60 * 1000; // 5 minutes
+        const timeSinceLastRaid = currentTime - target.lastRaid;
+        const isOnCooldown = timeSinceLastRaid < cooldownPeriod;
+        const remainingMinutes = isOnCooldown ? Math.ceil((cooldownPeriod - timeSinceLastRaid) / 1000 / 60) : 0;
+        
         return `
-            <div class="raid-target" style="background: #222; border: 2px solid ${difficultyColor}; 
-                        border-radius: 10px; padding: 15px; margin-bottom: 10px; cursor: pointer;"
+            <div class="raid-target" style="background: #222; border: 2px solid ${isOnCooldown ? '#666' : difficultyColor}; 
+                        border-radius: 10px; padding: 15px; margin-bottom: 10px; cursor: pointer; opacity: ${isOnCooldown ? '0.6' : '1'};"
                  onclick="game.screens.raid.selectTarget('${target.id}')">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
                     <div>
-                        <div style="font-weight: bold; color: #fff;">${target.name}</div>
+                        <div style="font-weight: bold; color: #fff;">
+                            ${target.name}
+                            ${isOnCooldown ? ' ⏰' : ''}
+                        </div>
                         <div style="font-size: 12px; color: #aaa;">${target.city}</div>
                     </div>
                     <div style="text-align: right;">
-                        <div style="color: ${difficultyColor}; font-weight: bold; font-size: 14px;">
-                            ${difficultyText}
+                        <div style="color: ${isOnCooldown ? '#666' : difficultyColor}; font-weight: bold; font-size: 14px;">
+                            ${isOnCooldown ? 'On Cooldown' : difficultyText}
                         </div>
-                        <div style="font-size: 10px; color: #aaa;">Difficulty</div>
+                        <div style="font-size: 10px; color: #aaa;">
+                            ${isOnCooldown ? `${remainingMinutes}m left` : 'Difficulty'}
+                        </div>
                     </div>
                 </div>
                 
@@ -158,6 +165,13 @@ export class RaidScreen {
                     <div>📦 ${totalDrugs} drugs</div>
                     <div>👥 ${target.gangSize} guards</div>
                 </div>
+                
+                ${isOnCooldown ? `
+                    <div style="background: #333; padding: 8px; border-radius: 5px; margin-top: 10px; 
+                                text-align: center; font-size: 11px; color: #ffaa00;">
+                        ⏰ Cooldown: ${remainingMinutes} minutes remaining
+                    </div>
+                ` : ''}
             </div>
         `;
     }
@@ -176,6 +190,19 @@ export class RaidScreen {
         );
         const successColor = successChance > 0.7 ? '#66ff66' : 
                            successChance > 0.5 ? '#ffff00' : '#ff6666';
+        
+        // Check if we have enough guns for the raid
+        const hasEnoughGuns = availableGunsInCity >= this.raidGangSize;
+        const hasEnoughGang = availableGangInCity >= this.raidGangSize;
+        
+        // Check if target is on cooldown
+        const currentTime = Date.now();
+        const cooldownPeriod = 5 * 60 * 1000; // 5 minutes
+        const timeSinceLastRaid = currentTime - target.lastRaid;
+        const isOnCooldown = timeSinceLastRaid < cooldownPeriod;
+        const remainingMinutes = isOnCooldown ? Math.ceil((cooldownPeriod - timeSinceLastRaid) / 1000 / 60) : 0;
+        
+        const canExecuteRaid = hasEnoughGuns && hasEnoughGang && !isOnCooldown;
         
         return `
             <div style="background: #222; border: 1px solid #444; border-radius: 10px; padding: 15px;">
@@ -196,13 +223,13 @@ export class RaidScreen {
                     <div style="font-size: 12px; color: #aaa; margin-bottom: 8px;">
                         👥 Gang Members in ${currentCity}: ${this.raidGangSize} / ${availableGangInCity}
                     </div>
-                    <input type="range" min="3" max="${Math.min(availableGangInCity, 10)}" 
+                    <input type="range" min="3" max="${Math.min(availableGangInCity, 25)}" 
                            value="${this.raidGangSize}" 
                            oninput="game.screens.raid.updateGangSize(this.value)"
                            style="width: 100%;">
                     <div style="display: flex; justify-content: space-between; font-size: 10px; color: #666; margin-top: 5px;">
                         <span>3</span>
-                        <span>${Math.min(availableGangInCity, 10)}</span>
+                        <span>${Math.min(availableGangInCity, 25)}</span>
                     </div>
                 </div>
                 
@@ -212,18 +239,51 @@ export class RaidScreen {
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 10px;">
                         <div>Your Gang: <span style="color: #ffff00;">${this.raidGangSize}</span></div>
                         <div>Enemy Guards: <span style="color: #ff6666;">${target.gangSize}</span></div>
-                        <div>Your Guns: <span style="color: #66ff66;">${availableGunsInCity}</span></div>
+                        <div>Your Guns: <span style="color: ${hasEnoughGuns ? '#66ff66' : '#ff6666'};">${availableGunsInCity}</span></div>
                         <div>Difficulty: <span style="color: ${this.systems.raid.getDifficultyColor(target.difficulty)};">
                             ${this.systems.raid.getDifficultyText(target.difficulty)}
                         </span></div>
                     </div>
                 </div>
                 
+                <!-- Validation Warnings -->
+                ${!hasEnoughGuns ? `
+                    <div style="background: #220000; border: 1px solid #660000; border-radius: 8px; 
+                                padding: 10px; margin-bottom: 15px;">
+                        <div style="font-size: 12px; color: #ff6666;">
+                            ⚠️ Not enough guns! You need ${this.raidGangSize} guns for ${this.raidGangSize} gang members, 
+                            but only have ${availableGunsInCity} available in ${currentCity}.
+                        </div>
+                    </div>
+                ` : ''}
+                
+                ${!hasEnoughGang ? `
+                    <div style="background: #220000; border: 1px solid #660000; border-radius: 8px; 
+                                padding: 10px; margin-bottom: 15px;">
+                        <div style="font-size: 12px; color: #ff6666;">
+                            ⚠️ Not enough gang members! You need ${this.raidGangSize} gang members, 
+                            but only have ${availableGangInCity} available in ${currentCity}.
+                        </div>
+                    </div>
+                ` : ''}
+                
                 <!-- Execute Raid -->
                 <button id="executeRaidBtn" 
-                        class="action-btn" style="width: 100%; padding: 12px; background: #660000; border-color: #ff6666;">
+                        class="action-btn" 
+                        onclick="game.screens.raid.executeRaid()"
+                        style="width: 100%; padding: 12px; background: ${canExecuteRaid ? '#660000' : '#333'}; border-color: ${canExecuteRaid ? '#ff6666' : '#666'};"
+                        ${!canExecuteRaid ? 'disabled' : ''}>
                     ⚔️ Execute Raid
                 </button>
+                
+                ${!canExecuteRaid ? `
+                    <div style="font-size: 11px; color: #666; text-align: center; margin-top: 8px;">
+                        ${isOnCooldown ? 
+                            `⏰ Target on cooldown - ${remainingMinutes} minutes remaining` : 
+                            'Cannot execute raid - requirements not met'
+                        }
+                    </div>
+                ` : ''}
             </div>
         `;
     }
@@ -253,13 +313,35 @@ export class RaidScreen {
         console.log('available gang in city:', this.state.getAvailableGangMembersInCity(city));
         console.log('available guns in city:', this.state.getAvailableGunsInCity(city));
         
-        const result = this.systems.raid.executeRaid(city, this.selectedTarget, this.raidGangSize);
+        const result = this.systems.raid.executeRaid(this.selectedTarget, this.raidGangSize);
         console.log('raid result:', result);
+        console.log('result type:', typeof result);
+        console.log('result keys:', result ? Object.keys(result) : 'null');
         
         if (result && typeof result === 'object') {
-            this.showRaidResults(result);
+            if (result.onCooldown) {
+                // Show cooldown popup
+                this.ui.modals.alert(
+                    result.error,
+                    'Target on Cooldown'
+                );
+            } else if (result.success !== undefined) {
+                this.showRaidResults(result);
+            } else {
+                console.log('Raid failed or returned false');
+                // Show a modal to inform the user about the validation failure
+                this.ui.modals.alert(
+                    result.error || 'Raid cannot be executed. Check the event log for details about why the raid failed.',
+                    'Raid Failed'
+                );
+            }
         } else {
             console.log('Raid failed or returned false');
+            // Show a modal to inform the user about the validation failure
+            this.ui.modals.alert(
+                'Raid cannot be executed. Check the event log for details about why the raid failed.',
+                'Raid Failed'
+            );
         }
         // If result is false, the raid system already logged the error message
     }
@@ -268,13 +350,17 @@ export class RaidScreen {
         const modal = this.ui.modals.create('⚔️ Raid Results', this.renderRaidResults(result));
         modal.show();
         
-        // Reset selection
-        this.selectedTarget = null;
+        // Don't reset target selection - let user choose to raid same target again
+        // Only reset gang size to default
         this.raidGangSize = 3;
     }
     
     renderRaidResults(result) {
         if (result.success) {
+            const cash = result.loot?.cash || 0;
+            const drugs = result.loot?.drugs || {};
+            const heatIncrease = result.heatIncrease || 0;
+            
             return `
                 <div style="background: #002200; border: 1px solid #006600; border-radius: 10px; 
                             padding: 20px; text-align: center; margin-bottom: 20px;">
@@ -283,36 +369,29 @@ export class RaidScreen {
                         Raid Successful!
                     </div>
                     <div style="font-size: 14px; color: #aaffaa;">
-                        Looted $${result.loot.cash.toLocaleString()} and drugs
+                        Looted $${cash.toLocaleString()} and drugs
                     </div>
                 </div>
                 
                 <div style="background: #222; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
                     <div style="font-size: 14px; color: #ffff00; margin-bottom: 10px;">Loot Details</div>
                     <div style="font-size: 12px; color: #aaa;">
-                        <div>💰 Cash: $${result.loot.cash.toLocaleString()}</div>
-                        ${Object.keys(result.loot.drugs).map(drug => 
-                            `<div>📦 ${drug}: ${result.loot.drugs[drug]}</div>`
+                        <div>💰 Cash: $${cash.toLocaleString()}</div>
+                        ${Object.keys(drugs).map(drug => 
+                            `<div>📦 ${drug}: ${drugs[drug]}</div>`
                         ).join('')}
                     </div>
                 </div>
                 
-                ${result.gangLosses > 0 ? `
-                    <div style="background: #220000; border: 1px solid #660000; border-radius: 8px; 
-                                padding: 15px; margin-bottom: 15px;">
-                        <div style="font-size: 12px; color: #ff6666;">
-                            ❌ Lost ${result.gangLosses} gang members
-                        </div>
-                    </div>
-                ` : ''}
-                
                 <div style="background: #220000; border: 1px solid #660000; border-radius: 8px; padding: 15px;">
                     <div style="font-size: 12px; color: #ff6666;">
-                        🔥 Heat increased by ${result.heatIncrease.toLocaleString()}
+                        🔥 Heat increased by ${heatIncrease.toLocaleString()}
                     </div>
                 </div>
             `;
         } else {
+            const heatIncrease = result.heatIncrease || 0;
+            
             return `
                 <div style="background: #220000; border: 1px solid #660000; border-radius: 10px; 
                             padding: 20px; text-align: center; margin-bottom: 20px;">
@@ -325,16 +404,9 @@ export class RaidScreen {
                     </div>
                 </div>
                 
-                <div style="background: #220000; border: 1px solid #660000; border-radius: 8px; 
-                            padding: 15px; margin-bottom: 15px;">
-                    <div style="font-size: 12px; color: #ff6666;">
-                        ❌ Lost ${result.gangLosses} gang members
-                    </div>
-                </div>
-                
                 <div style="background: #220000; border: 1px solid #660000; border-radius: 8px; padding: 15px;">
                     <div style="font-size: 12px; color: #ff6666;">
-                        🔥 Heat increased by ${result.heatIncrease.toLocaleString()}
+                        🔥 Heat increased by ${heatIncrease.toLocaleString()}
                     </div>
                 </div>
             `;

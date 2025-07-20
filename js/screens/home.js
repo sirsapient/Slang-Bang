@@ -19,16 +19,6 @@ export class HomeScreen {
         const safeCash = (cash !== undefined && cash !== null && !isNaN(cash)) ? cash : 0;
         
         return `
-            <!-- Player Card -->
-            <div class="player-card">
-                <div style="font-size: 12px; color: #aaa; margin-bottom: 5px;">💰 Cash on Hand</div>
-                <div class="cash-display">$<span id="homeCash">${safeCash.toLocaleString()}</span></div>
-                <div style="font-size: 10px; color: #666; margin-top: 5px;">
-                    Day <span id="homeDay">${day}</span> • 
-                    <span id="dayCountdown" style="color: #66ff66;">60s</span>
-                </div>
-            </div>
-            
             <!-- Current Location -->
             <div style="background: #333; border: 1px solid #666; border-radius: 10px; padding: 15px; margin-bottom: 20px; text-align: center;">
                 <div style="font-size: 12px; color: #aaa; margin-bottom: 5px;">📍 Current Location</div>
@@ -36,14 +26,27 @@ export class HomeScreen {
                 <div style="font-size: 12px; color: #aaa;">Population: ${cityData.population}</div>
             </div>
 
-            <!-- Flex Score Card -->
-            <div style="background: #222; padding: 15px; border-radius: 10px; margin-bottom: 20px;">
-                <div style="font-size: 14px; color: #ff66ff; margin-bottom: 10px;">⭐ Flex Score</div>
-                <div style="font-size: 24px; font-weight: bold;" class="flex-score-display">
-                    ${window.game?.systems?.assets?.calculateFlexScore() || 0}
+            <!-- Cash and Flex Score Side by Side -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px;">
+                <!-- Cash Card -->
+                <div style="background: #222; border: 1px solid #666; border-radius: 10px; padding: 15px; text-align: center;">
+                    <div style="font-size: 12px; color: #aaa; margin-bottom: 5px;">💰 Cash on Hand</div>
+                    <div style="font-size: 20px; color: #66ff66; font-weight: bold;">$<span id="homeCash">${safeCash.toLocaleString()}</span></div>
+                    <div style="font-size: 10px; color: #666; margin-top: 5px;">
+                        Day <span id="homeDay">${day}</span> • 
+                        <span id="dayCountdown" style="color: #66ff66;">60s</span>
+                    </div>
                 </div>
-                <div style="font-size: 11px; color: #aaa; margin-top: 5px;">
-                    From jewelry, cars & property
+                
+                <!-- Flex Score Card -->
+                <div style="background: #222; border: 1px solid #666; border-radius: 10px; padding: 15px; text-align: center;">
+                    <div style="font-size: 12px; color: #ff66ff; margin-bottom: 5px;">⭐ Flex Score</div>
+                    <div style="font-size: 20px; font-weight: bold;" class="flex-score-display">
+                        ${(window.game?.systems?.assets?.calculateFlexScore && window.game.systems.assets.calculateFlexScore()) || 0}
+                    </div>
+                    <div style="font-size: 10px; color: #aaa; margin-top: 5px;">
+                        From jewelry, cars & property
+                    </div>
                 </div>
             </div>
             
@@ -112,28 +115,36 @@ export class HomeScreen {
                     <div class="app-name">Ranking</div>
                 </div>
                 
+                <div class="app-icon" onclick="game.screens.home.showAchievementsModal()">
+                    <div class="app-emoji">🏅</div>
+                    <div class="app-name">Achievements</div>
+                </div>
+                
                 <div class="app-icon" onclick="game.screens.home.showSettingsModal()">
                     <div class="app-emoji">⚙️</div>
                     <div class="app-name">Settings</div>
                 </div>
                 
+                <div class="app-icon" onclick="game.showScreen('mail')" id="mailAppIcon">
+                    <div class="app-emoji">📧</div>
+                    <div class="app-name">Mail</div>
+                    <div id="unreadCount" style="font-size: 9px; color: #66ccff; font-weight: bold; margin-top: 2px;">
+                        ${this.state.getUnreadNotifications().length} unread
+                    </div>
+                </div>
+                
 
-            </div>
-            
-            <!-- Event Log -->
-            <div class="event-log">
-                <div style="text-align: center; margin-bottom: 10px; color: #666; font-size: 12px;">📰 Recent Activity</div>
-                <div id="eventLog">${this.ui.events.getHTML()}</div>
             </div>
         `;
     }
     
     onShow() {
-        // Update event log reference
-        this.ui.events.setContainer(document.getElementById('eventLog'));
-        
         // Refresh heat display
         this.systems.heat.calculateHeatLevel();
+        
+        // Update unread count
+        this.updateUnreadCount();
+        
         // Attach event handler for Assets button
         const assetsBtn = document.getElementById('assetsAppIcon');
         if (assetsBtn) {
@@ -244,26 +255,21 @@ export class HomeScreen {
         const currentCity = this.state.get('currentCity');
         if (quantity <= 0) return;
         
-        // Close the Quick Buy modal, then show the confirm modal
-        this.ui.modals.close();
-        setTimeout(() => {
-            this.ui.modals.confirm(
-                `Buy ${quantity} guns in ${currentCity} for $${cost.toLocaleString()}?`,
-                () => {
-                    console.log('quickBuyGuns confirm callback this:', this);
-                    if (this.state.canAfford(cost)) {
-                        console.log('Updating cash and guns...');
-                        this.state.updateCash(-cost);
-                        this.state.addGunsToCity(currentCity, quantity);
-                        this.ui.events.add(`Purchased ${quantity} guns in ${currentCity} for $${cost.toLocaleString()}`, 'good');
-                        this.refreshQuickBuyModal();
-                    } else {
-                        console.log('Not enough cash!');
-                    }
-                },
-                null
-            );
-        }, 350); // Wait for the modal close animation to finish
+        // Show confirm modal directly without closing first
+        this.ui.modals.confirm(
+            `Buy ${quantity} guns in ${currentCity} for $${cost.toLocaleString()}?`,
+            () => {
+                if (this.state.canAfford(cost)) {
+                    this.state.updateCash(-cost);
+                    this.state.addGunsToCity(currentCity, quantity);
+                    this.ui.events.add(`Purchased ${quantity} guns in ${currentCity} for $${cost.toLocaleString()}`, 'good');
+                    this.refreshQuickBuyModal();
+                } else {
+                    this.ui.modals.alert('Not enough cash for this purchase!', 'Purchase Failed');
+                }
+            },
+            null
+        );
     }
     
     quickBuyGang() {
@@ -274,28 +280,23 @@ export class HomeScreen {
         const currentCity = this.state.get('currentCity');
         if (quantity <= 0) return;
         
-        // Close the Quick Buy modal, then show the confirm modal
-        this.ui.modals.close();
-        setTimeout(() => {
-            this.ui.modals.confirm(
-                `Recruit ${quantity} gang members in ${currentCity} for $${cost.toLocaleString()}?<br><small>Heat will increase by ${heat.toLocaleString()}</small>`,
-                () => {
-                    console.log('quickBuyGang confirm callback this:', this);
-                    if (this.state.canAfford(cost)) {
-                        console.log('Updating cash, gang members, and warrant...');
-                        this.state.updateCash(-cost);
-                        this.state.addGangMembers(currentCity, quantity);
-                        this.state.updateWarrant(heat);
-                        this.ui.events.add(`Recruited ${quantity} gang members in ${currentCity} for $${cost.toLocaleString()}`, 'good');
-                        this.ui.events.add(`Gang recruitment increased heat by ${heat.toLocaleString()}`, 'bad');
-                        this.refreshQuickBuyModal();
-                    } else {
-                        console.log('Not enough cash!');
-                    }
-                },
-                null
-            );
-        }, 350); // Wait for the modal close animation to finish
+        // Show confirm modal directly without closing first
+        this.ui.modals.confirm(
+            `Recruit ${quantity} gang members in ${currentCity} for $${cost.toLocaleString()}?<br><small>Heat will increase by ${heat.toLocaleString()}</small>`,
+            () => {
+                if (this.state.canAfford(cost)) {
+                    this.state.updateCash(-cost);
+                    this.state.addGangMembers(currentCity, quantity);
+                    this.state.updateWarrant(heat);
+                    this.ui.events.add(`Recruited ${quantity} gang members in ${currentCity} for $${cost.toLocaleString()}`, 'good');
+                    this.ui.events.add(`Gang recruitment increased heat by ${heat.toLocaleString()}`, 'bad');
+                    this.refreshQuickBuyModal();
+                } else {
+                    this.ui.modals.alert('Not enough cash for this purchase!', 'Purchase Failed');
+                }
+            },
+            null
+        );
     }
     
     refreshQuickBuyModal() {
@@ -329,10 +330,32 @@ export class HomeScreen {
     }
     
     calculateGangMemberCost() {
-        const baseCost = this.game.data.config.baseGangCost;
-        const cityModifier = this.game.data.cities[this.state.get('currentCity')].heatModifier;
-        const gangModifier = 1 + (this.state.get('gangSize') * this.game.data.config.gangCostScaling);
-        return Math.floor(baseCost * cityModifier * gangModifier);
+        const baseCost = this.game.data.config.baseGangCost || 10000;
+        const currentCity = this.state.get('currentCity');
+        const cityData = this.game.data.cities[currentCity];
+        const cityModifier = cityData?.heatModifier || 1.0;
+        const gangSize = this.state.get('gangSize') || 0;
+        const gangCostScaling = this.game.data.config.gangCostScaling || 0.1;
+        const gangModifier = 1 + (gangSize * gangCostScaling);
+        
+        const cost = Math.floor(baseCost * cityModifier * gangModifier);
+        
+        // Cap the price at 40,000
+        const cappedCost = Math.min(cost, 40000);
+        
+        // Debug logging
+        console.log('Home screen gang cost calculation:', {
+            baseCost,
+            currentCity,
+            cityModifier,
+            gangSize,
+            gangCostScaling,
+            gangModifier,
+            calculatedCost: cost,
+            cappedCost: cappedCost
+        });
+        
+        return cappedCost;
     }
     
     // Modal: Bribery
@@ -384,6 +407,7 @@ export class HomeScreen {
         const currentRankId = this.getCurrentRank();
         const currentRank = this.game.data.playerRanks[currentRankId];
         const nextRank = currentRankId < 7 ? this.game.data.playerRanks[currentRankId + 1] : null;
+        const assetCount = (window.game?.systems?.assets?.getOwnedAssetCount && window.game.systems.assets.getOwnedAssetCount()) || 0;
         
         return `
             <div style="text-align: center; padding: 20px;">
@@ -395,9 +419,11 @@ export class HomeScreen {
                     <div style="font-size: 14px; color: #ffff00; margin-bottom: 10px;">📊 Current Stats</div>
                     <div style="text-align: left; font-size: 12px;">
                         💰 Net Worth: $${netWorth.toLocaleString()}<br>
+                        💎 Asset Value: $${(this.systems.assets?.getTotalAssetValue && this.systems.assets.getTotalAssetValue()) || 0}<br>
                         🏢 Bases: ${Object.keys(this.state.data.bases).length}<br>
                         👥 Gang: ${this.state.get('gangSize')}<br>
-                        🔫 Guns: ${this.state.get('guns')}
+                        🔫 Guns: ${this.state.get('guns')}<br>
+                        💎 Assets Owned: ${assetCount}
                     </div>
                 </div>
                 
@@ -410,7 +436,8 @@ export class HomeScreen {
                             Need:<br>
                             💰 $${nextRank.minNetWorth.toLocaleString()} net worth<br>
                             🏢 ${nextRank.minBases} bases<br>
-                            👥 ${nextRank.minGang} gang members
+                            👥 ${nextRank.minGang} gang members<br>
+                            ${nextRank.minAssets > 0 ? `💎 ${nextRank.minAssets} assets<br>` : ''}
                         </div>
                     </div>
                 ` : `
@@ -428,13 +455,15 @@ export class HomeScreen {
         const netWorth = this.state.calculateNetWorth();
         const basesOwned = Object.keys(this.state.data.bases).length;
         const gangSize = this.state.get('gangSize');
+        const assetCount = (window.game?.systems?.assets?.getOwnedAssetCount && window.game.systems.assets.getOwnedAssetCount()) || 0;
         
         let currentRank = 1;
         for (let rankId = 7; rankId >= 1; rankId--) {
             const rank = this.game.data.playerRanks[rankId];
             if (netWorth >= rank.minNetWorth && 
                 basesOwned >= rank.minBases && 
-                gangSize >= rank.minGang) {
+                gangSize >= rank.minGang &&
+                assetCount >= rank.minAssets) {
                 currentRank = rankId;
                 break;
             }
@@ -482,6 +511,122 @@ export class HomeScreen {
         } else {
             this.ui.modals.alert('You need to be Rank 4 (District Chief) to access the Asset Store. Keep building your empire!');
             return;
+        }
+    }
+    
+    showAchievementsModal() {
+        const modal = this.ui.modals.create('🏅 Achievements', this.renderAchievementsContent());
+        modal.show();
+    }
+    
+    renderAchievementsContent() {
+        const achievements = this.state.getAchievements();
+        const progress = achievements.progress;
+        const unlocked = achievements.unlocked;
+        
+        const allAchievements = [
+            { id: 'firstBase', name: '🏠 First Base', description: 'Purchase your first base', icon: '🏠' },
+            { id: 'firstRaid', name: '⚔️ First Raid', description: 'Conduct your first raid', icon: '⚔️' },
+            { id: 'firstAsset', name: '💎 First Asset', description: 'Purchase your first asset', icon: '💎' },
+            { id: 'millionaire', name: '💰 Millionaire', description: 'Reach $1M net worth', icon: '💰' },
+            { id: 'drugLord', name: '💎 Drug Lord', description: 'Reach $5M net worth', icon: '💎' },
+            { id: 'cartelBoss', name: '🏆 Cartel Boss', description: 'Reach $10M net worth', icon: '🏆' },
+            { id: 'raidMaster', name: '⚔️ Raid Master', description: 'Successfully complete 50 raids', icon: '⚔️' },
+            { id: 'empireBuilder', name: '🏢 Empire Builder', description: 'Own 10 bases', icon: '🏢' },
+            { id: 'assetCollector', name: '💎 Asset Collector', description: 'Own 20 assets', icon: '💎' },
+            { id: 'survivor', name: '🕊️ Survivor', description: 'Survive 100 days', icon: '🕊️' },
+            { id: 'heatMaster', name: '🔥 Heat Master', description: 'Survive with 50K+ warrant', icon: '🔥' },
+            { id: 'traveler', name: '✈️ Traveler', description: 'Visit 8 different cities', icon: '✈️' }
+        ];
+        
+        let content = `
+            <div style="text-align: center; padding: 20px;">
+                <div style="font-size: 18px; color: #ffff00; margin-bottom: 20px;">
+                    🏅 Achievement Progress
+                </div>
+                <div style="font-size: 12px; color: #aaa; margin-bottom: 20px;">
+                    ${unlocked.length} of ${allAchievements.length} achievements unlocked
+                </div>
+        `;
+        
+        // Filter to only show unlocked achievements
+        const unlockedAchievements = allAchievements.filter(achievement => unlocked.includes(achievement.id));
+        
+        if (unlockedAchievements.length === 0) {
+            content += `
+                <div style="background: #1a1a1a; border: 1px solid #666; border-radius: 8px; 
+                            padding: 40px 20px; text-align: center; margin-bottom: 10px;">
+                    <div style="font-size: 48px; margin-bottom: 15px;">🏅</div>
+                    <div style="font-size: 16px; color: #aaa; margin-bottom: 10px;">
+                        No achievements unlocked yet
+                    </div>
+                    <div style="font-size: 12px; color: #666;">
+                        Keep playing to unlock achievements!
+                    </div>
+                </div>
+            `;
+        } else {
+            unlockedAchievements.forEach(achievement => {
+                content += `
+                    <div style="background: #1a3a1a; border: 1px solid #66ff66; 
+                                border-radius: 8px; padding: 12px; margin-bottom: 10px;">
+                        <div style="display: flex; align-items: center; justify-content: space-between;">
+                            <div style="text-align: left;">
+                                <div style="font-size: 14px; color: #66ff66; font-weight: bold;">
+                                    ${achievement.icon} ${achievement.name}
+                                </div>
+                                <div style="font-size: 11px; color: #aaa;">
+                                    ${achievement.description}
+                                </div>
+                            </div>
+                            <div style="text-align: right;">
+                                <div style="color: #66ff66; font-size: 12px;">✓ UNLOCKED</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+        
+        content += `
+                <div style="background: #222; padding: 15px; border-radius: 10px; margin-top: 20px;">
+                    <div style="font-size: 14px; color: #ffff00; margin-bottom: 10px;">📊 Current Stats</div>
+                    <div style="text-align: left; font-size: 11px; color: #aaa;">
+                        Total Raids: ${progress.totalRaids || 0}<br>
+                        Successful Raids: ${progress.successfulRaids || 0}<br>
+                        Total Earnings: $${(progress.totalEarnings || 0).toLocaleString()}<br>
+                        Bases Owned: ${progress.basesOwned || 0}<br>
+                        Assets Owned: ${progress.assetsOwned || 0}<br>
+                        Days Survived: ${progress.daysSurvived || 0}<br>
+                        Cities Visited: ${progress.citiesVisited || 0}<br>
+                        Max Net Worth: $${(progress.maxNetWorth || 0).toLocaleString()}<br>
+                        Max Heat Survived: ${(progress.maxHeatSurvived || 0).toLocaleString()}
+                    </div>
+                </div>
+            </div>
+        `;
+        
+        return content;
+    }
+    
+    updateUnreadCount() {
+        const unreadCountEl = document.getElementById('unreadCount');
+        if (unreadCountEl) {
+            const unreadCount = this.state.getUnreadNotifications().length;
+            unreadCountEl.textContent = `${unreadCount} unread`;
+            unreadCountEl.style.color = unreadCount > 0 ? '#66ccff' : '#666';
+            
+            // Also update the mail app icon styling if there are unread notifications
+            const mailAppIcon = document.getElementById('mailAppIcon');
+            if (mailAppIcon) {
+                if (unreadCount > 0) {
+                    mailAppIcon.style.borderColor = '#66ccff';
+                    mailAppIcon.style.boxShadow = '0 0 10px rgba(102, 204, 255, 0.3)';
+                } else {
+                    mailAppIcon.style.borderColor = '#666';
+                    mailAppIcon.style.boxShadow = 'none';
+                }
+            }
         }
     }
     
@@ -674,33 +819,56 @@ export class HomeScreen {
             return;
         }
         
-        // Calculate transfer cost (base cost per gang member)
-        const transferCost = amount * this.game.data.config.baseGangCost * 0.5; // 50% of recruitment cost
+        // Calculate transfer cost using improved formula
+        const transferCost = this.calculateTransferCost(fromCity, toCity, amount);
         console.log('Transfer cost:', transferCost);
         
+        if (!this.state.canAfford(transferCost)) {
+            this.ui.modals.alert(`Not enough cash for transfer. Need $${transferCost.toLocaleString()}`, 'Transfer Failed');
+            return;
+        }
+        
+        // Show detailed confirmation popup
         this.ui.modals.confirm(
-            `Transfer ${amount} gang members from ${fromCity} to ${toCity} for $${transferCost.toLocaleString()}?`,
+            `Transfer ${amount} gang members from ${fromCity} to ${toCity}?<br><br>` +
+            `<strong>Cost:</strong> $${transferCost.toLocaleString()}<br>` +
+            `<strong>Distance:</strong> ${Math.abs(this.game.data.cities[fromCity].distanceIndex - this.game.data.cities[toCity].distanceIndex)} units<br>` +
+            `<strong>Available in ${fromCity}:</strong> ${availableInCity} members<br><br>` +
+            `This action cannot be undone.`,
             () => {
                 console.log('Transfer confirmed');
-                if (this.state.canAfford(transferCost)) {
-                    console.log('Can afford transfer, executing...');
-                    // Remove from source city
-                    this.state.removeGangMembersFromCity(fromCity, amount);
-                    // Add to destination city
-                    this.state.addGangMembers(toCity, amount);
-                    // Pay transfer cost
-                    this.state.updateCash(-transferCost);
-                    
-                    this.ui.events.add(`Transferred ${amount} gang members from ${fromCity} to ${toCity} for $${transferCost.toLocaleString()}`, 'good');
-                    this.ui.modals.close();
-                    this.showGangManagementModal(); // Refresh the modal
-                } else {
-                    console.log('Cannot afford transfer');
-                    this.ui.modals.alert(`Not enough cash for transfer. Need $${transferCost.toLocaleString()}`, 'Transfer Failed');
-                }
+                // Remove from source city
+                this.state.removeGangMembersFromCity(fromCity, amount);
+                // Add to destination city
+                this.state.addGangMembers(toCity, amount);
+                // Pay transfer cost
+                this.state.updateCash(-transferCost);
+                
+                this.ui.events.add(`Transferred ${amount} gang members from ${fromCity} to ${toCity} for $${transferCost.toLocaleString()}`, 'good');
+                this.ui.modals.close();
+                this.showGangManagementModal(); // Refresh the modal
             },
             null
         );
+    }
+    
+    calculateTransferCost(fromCity, toCity, amount) {
+        // Base transfer cost per member
+        const baseTransferCost = this.game.data.config.baseGangCost * 0.3; // 30% of recruitment cost
+        
+        // Distance multiplier based on city distance
+        const fromDistance = this.game.data.cities[fromCity]?.distanceIndex || 0;
+        const toDistance = this.game.data.cities[toCity]?.distanceIndex || 0;
+        const distance = Math.abs(fromDistance - toDistance);
+        const distanceMultiplier = 1 + (distance * 0.1); // 10% more per distance unit
+        
+        // Heat modifier (higher heat cities cost more to transfer to)
+        const toCityHeat = this.game.data.cities[toCity]?.heatModifier || 1.0;
+        const heatMultiplier = 1 + (toCityHeat - 1) * 0.5; // 50% of heat modifier
+        
+        const totalCost = Math.floor(baseTransferCost * amount * distanceMultiplier * heatMultiplier);
+        
+        return totalCost;
     }
     
     transferGuns() {

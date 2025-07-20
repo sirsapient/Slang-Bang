@@ -59,13 +59,14 @@ export class HeatSystem {
             const warrantReduction = Math.floor(currentWarrant * decayRate);
             if (warrantReduction > 0) {
                 this.state.updateWarrant(-warrantReduction);
-                if (daysSinceTravel === 3) {
-                    this.events.add(`🕊️ Laying low is working - warrant reduced by ${formatNumber(warrantReduction)}`, 'good');
-                } else if (daysSinceTravel === 7) {
-                    this.events.add(`😎 Heat cooling down - warrant reduced by ${formatNumber(warrantReduction)}`, 'good');
-                } else if (daysSinceTravel >= 14 && daysSinceTravel % 7 === 0) {
-                    this.events.add(`🏖️ Deep cover paying off - warrant reduced by ${formatNumber(warrantReduction)}`, 'good');
-                }
+                this.events.add(`🕊️ Laying low is working - warrant reduced by ${formatNumber(warrantReduction)}`, 'good');
+                // Removed notification - only keep event log
+            } else if (daysSinceTravel === 7) {
+                this.events.add(`😎 Heat cooling down - warrant reduced by ${formatNumber(warrantReduction)}`, 'good');
+                // Removed notification - only keep event log
+            } else if (daysSinceTravel >= 14 && daysSinceTravel % 7 === 0) {
+                this.events.add(`🏖️ Deep cover paying off - warrant reduced by ${formatNumber(warrantReduction)}`, 'good');
+                // Removed notification - only keep event log
             }
         }
     }
@@ -152,6 +153,7 @@ export class HeatSystem {
             raidMessage += ' (cash loss capped for 24h)';
         }
         this.events.add(raidMessage, 'bad');
+        this.state.addNotification(raidMessage, 'error');
     }
 
     /**
@@ -161,11 +163,12 @@ export class HeatSystem {
         const gangSize = this.state.get('gangSize');
         const inventory = this.state.get('inventory');
         const hasDrugs = Object.values(inventory).some(amount => amount > 0);
-        if (gangSize > 0 && hasDrugs) {
+        if (hasDrugs) {
             const warrantIncrease = Math.floor(gangSize * 100 * Math.random());
             if (warrantIncrease > 0) {
                 this.state.updateWarrant(warrantIncrease);
                 this.events.add(`Gang activities increased heat by ${formatNumber(warrantIncrease)}`, 'bad');
+                // Removed notification - only keep event log
             }
         }
     }
@@ -195,6 +198,7 @@ export class HeatSystem {
         this.state.updateCash(-cost);
         this.state.updateWarrant(-reduction);
         this.events.add(`💰 Paid ${formatCurrency(cost)} in bribes - warrant reduced by ${formatNumber(reduction)}`, 'good');
+        this.state.addNotification(`💰 Paid ${formatCurrency(cost)} in bribes - warrant reduced by ${formatNumber(reduction)}`, 'success');
         if (Math.random() < 0.05) {
             const backfireWarrant = Math.floor(cost * 0.1);
             this.state.updateWarrant(backfireWarrant);

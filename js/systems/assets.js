@@ -20,16 +20,17 @@ export class AssetSystem {
     }
 
     /**
-     * Get the current player rank ID based on net worth, bases, and gang size.
+     * Get the current player rank ID based on net worth, bases, gang size, and assets.
      * @returns {number} Current rank ID
      */
     getCurrentPlayerRank() {
         const netWorth = this.state.calculateNetWorth();
         const basesOwned = Object.keys(this.state.data.bases).length;
         const gangSize = this.state.get('gangSize');
+        const assetCount = this.getOwnedAssetCount();
 
         let currentRank = 1;
-        if (!this.data || !this.data.playerRanks) {
+        if (!this.data.playerRanks) {
             // Return error code for missing data, let UI handle alert
             return -1;
         }
@@ -38,7 +39,8 @@ export class AssetSystem {
             if (!rank) continue;
             if (netWorth >= rank.minNetWorth && 
                 basesOwned >= rank.minBases && 
-                gangSize >= rank.minGang) {
+                gangSize >= rank.minGang &&
+                assetCount >= rank.minAssets) {
                 currentRank = rankId;
                 break;
             }
@@ -102,25 +104,29 @@ export class AssetSystem {
     calculateFlexScore() {
         this.initializeAssets();
         let flexScore = 0;
+        const playerRank = window.game?.screens?.home?.getCurrentRank() || 1;
+        const flexMultiplier = this.data?.config?.assetFlexScoreMultiplier || 1.5;
+        const rankBonus = Math.pow(flexMultiplier, playerRank - 1);
+        
         this.getWornJewelry().forEach(jewelryId => {
             const jewelry = this.state.data.assets.owned[jewelryId];
             if (jewelry) {
-                flexScore += jewelry.flexScore || 0;
+                flexScore += (jewelry.flexScore || 0) * rankBonus;
             }
         });
         Object.values(this.state.data.assets.owned).forEach(asset => {
             if (asset.type === 'car') {
-                flexScore += asset.flexScore || 0;
+                flexScore += (asset.flexScore || 0) * rankBonus;
             }
         });
         let bestHouseFlex = 0;
         Object.values(this.state.data.assets.owned).forEach(asset => {
             if (asset.type === 'property') {
-                bestHouseFlex = Math.max(bestHouseFlex, asset.flexScore || 0);
+                bestHouseFlex = Math.max(bestHouseFlex, (asset.flexScore || 0) * rankBonus);
             }
         });
         flexScore += bestHouseFlex;
-        return flexScore;
+        return Math.floor(flexScore);
     }
 
     /**
@@ -157,6 +163,16 @@ export class AssetSystem {
             this.updateStorageCapacity(asset.capacity);
         }
         this.events.add(`💎 Purchased ${asset.name} for ${formatCurrency(asset.cost)}`, 'good');
+        
+        // Track achievements
+        this.state.trackAchievement('assetsOwned');
+        this.state.trackAchievement('firstAsset');
+        
+        // Add prestige notification for expensive assets
+        if (asset.cost >= 100000) {
+            this.state.addNotification(`🏆 Prestige Asset: ${asset.name}`, 'success');
+        }
+        
         if (asset.type === 'jewelry' && this.canWearMoreJewelry()) {
             this.wearJewelry(assetId);
         }
@@ -312,6 +328,15 @@ export class AssetSystem {
             total += asset.resaleValue || Math.floor(asset.cost * 0.9);
         });
         return total;
+    }
+
+    /**
+     * Get the total number of assets owned by the player.
+     * @returns {number}
+     */
+    getOwnedAssetCount() {
+        this.initializeAssets();
+        return Object.keys(this.state.data.assets.owned || {}).length;
     }
 
     /**

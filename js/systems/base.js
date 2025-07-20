@@ -50,6 +50,12 @@ export class BaseSystem {
             inventory: this.createEmptyInventory()
         });
         this.events.add(`🏠 Purchased Trap House in ${city} for ${formatCurrency(cost)}`, 'good');
+        this.state.addNotification(`🏠 Purchased Trap House in ${city} for ${formatCurrency(cost)}`, 'success');
+        
+        // Track achievements
+        this.state.trackAchievement('basesOwned');
+        this.state.trackAchievement('firstBase');
+        
         return { success: true };
     }
 
@@ -99,6 +105,9 @@ export class BaseSystem {
             base.assignedGang -= actualAmount;
             this.updateBaseOperationalStatus(city);
             this.events.add(`Removed ${actualAmount} gang members from ${city} base`, 'neutral');
+            if (window.game && window.game.ui && window.game.ui.modals) {
+                window.game.ui.modals.showNotification(`Removed ${actualAmount} gang members from ${city} base`, 'warning', 4000);
+            }
             return { success: true };
         }
         return { success: false, error: 'No gang members to remove' };
@@ -137,7 +146,13 @@ export class BaseSystem {
         const baseType = this.data.baseTypes[base.level];
         const efficiency = Math.min(1, base.assignedGang / baseType.gangRequired);
         const drugBonus = this.getBaseDrugCount(base) > 0 ? this.data.config.baseIncomeBonus : 1;
-        return Math.floor(baseType.income * efficiency * drugBonus);
+        
+        // Add rank-based income scaling
+        const playerRank = window.game?.screens?.home?.getCurrentRank() || 1;
+        const incomeScaling = this.data?.config?.baseIncomeScaling || 1.15;
+        const rankBonus = Math.pow(incomeScaling, playerRank - 1);
+        
+        return Math.floor(baseType.income * efficiency * drugBonus * rankBonus);
     }
 
     /**
@@ -175,9 +190,16 @@ export class BaseSystem {
         const base = this.state.getBase(city);
         if (!base || base.cashStored === 0) return { success: false, error: 'No income to collect' };
         const collected = base.cashStored;
+        // Guard: Only add if collected is a valid number
+        if (typeof collected !== 'number' || isNaN(collected) || collected < 0) {
+            console.warn(`Invalid base.cashStored value for ${city}:`, collected);
+            this.events.add(`⚠️ Error: Invalid cash stored in ${city} base.`, 'bad');
+            return { success: false, error: 'Invalid cash stored in base' };
+        }
         this.state.updateCash(collected);
         base.cashStored = 0;
         this.events.add(`💰 Collected ${formatCurrency(collected)} from ${city} base`, 'good');
+        // Removed notification - only keep event log
         return { success: true };
     }
 
@@ -189,6 +211,12 @@ export class BaseSystem {
         let totalCollected = 0;
         Object.values(this.state.data.bases).forEach(base => {
             if (base.cashStored > 0) {
+                // Guard: Only add if cashStored is a valid number
+                if (typeof base.cashStored !== 'number' || isNaN(base.cashStored) || base.cashStored < 0) {
+                    console.warn(`Invalid base.cashStored value in collectAllBaseCash:`, base.cashStored, base);
+                    this.events.add(`⚠️ Error: Invalid cash stored in a base. Skipping.`, 'bad');
+                    return;
+                }
                 totalCollected += base.cashStored;
                 base.cashStored = 0;
             }
@@ -196,6 +224,7 @@ export class BaseSystem {
         if (totalCollected > 0) {
             this.state.updateCash(totalCollected);
             this.events.add(`💰 Collected ${formatCurrency(totalCollected)} from all bases`, 'good');
+            // Removed notification - only keep event log
             return { success: true, totalCollected };
         }
         return { success: false, error: 'No income to collect' };
@@ -439,6 +468,11 @@ export class BaseSystem {
             base.cashStored = Math.max(0, base.cashStored - cashLost);
             base.guns = Math.max(0, (base.guns || 0) - gunsLost);
             base.assignedGang = Math.max(0, base.assignedGang - gangLost);
+            
+            // Add notification for gang losses
+            if (gangLost > 0 && window.game && window.game.ui && window.game.ui.modals) {
+                window.game.ui.modals.showNotification(`Lost ${gangLost} gang members from ${base.city} base in raid`, 'error', 4000);
+            }
             
             // Lose some drugs
             const drugsLost = {};

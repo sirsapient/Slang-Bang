@@ -49,12 +49,13 @@ export class BasesScreen {
                 </div>
             </div>
             </div>
-
-            ${this.renderBasePurchaseOrManagement(currentCity)}
+            <div style="padding-bottom: 80px;">${this.renderBasePurchaseOrManagement(currentCity)}</div>
             
             <!-- All Bases List -->
-            <div id="allBasesList">
-                ${this.renderAllBases()}
+            <div style="max-height: 45vh; overflow-y: auto; padding-bottom: 120px;" id="allBasesListContainer">
+                <div id="allBasesList">
+                    ${this.renderAllBases()}
+                </div>
             </div>
         `;
     }
@@ -84,6 +85,7 @@ export class BasesScreen {
                 <div style="font-size: 12px; color: #aaa; margin-bottom: 15px;">
                     Bases generate passive income when staffed with gang members and supplied with drugs.
                     <span style="color: #ffff00;">Requires 4+ gang members to operate.</span>
+                    <br><span style="color: #66ff66;">💡 Tip: Extra gang members and guns provide income bonuses and better defense!</span>
                 </div>
                 
                 <div style="background: #1a1a1a; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
@@ -121,14 +123,14 @@ export class BasesScreen {
         
         const baseType = this.game.data.baseTypes[base.level];
         const income = this.systems.bases.calculateBaseIncome(base);
-        const availableGang = this.state.getAvailableGangMembers();
+        const availableGang = this.state.getAvailableGangMembersInCity(city);
         
         return `
             <div class="market-item" style="border: 2px solid #66ff66;">
                 <div class="market-header">
                     <div class="drug-name">🏢 ${baseType.name} - ${city}</div>
                     <div style="color: ${base.operational ? '#66ff66' : '#ff6666'}; font-weight: bold;">
-                        ${base.operational ? '✅ Operational' : '❌ Understaffed'}
+                        ${base.operational ? '✅ Operational' : this.getBaseStatusMessage(base)}
                     </div>
                 </div>
                 
@@ -138,18 +140,21 @@ export class BasesScreen {
                         <div style="font-size: 10px; color: #aaa;">Gang Assigned</div>
                         <div style="color: #ffff00; font-weight: bold;">
                             ${base.assignedGang}/${baseType.gangRequired}
+                            ${base.assignedGang > baseType.gangRequired ? `<br><span style="color: #66ff66; font-size: 9px;">+${base.assignedGang - baseType.gangRequired} extra</span>` : ''}
                         </div>
                     </div>
                     <div>
                         <div style="font-size: 10px; color: #aaa;">Guns Assigned</div>
                         <div style="color: #ff6666; font-weight: bold;">
                             ${base.guns || 0}/${baseType.gunsRequired}
+                            ${(base.guns || 0) > baseType.gunsRequired ? `<br><span style="color: #66ff66; font-size: 9px;">+${(base.guns || 0) - baseType.gunsRequired} extra</span>` : ''}
                         </div>
                     </div>
                     <div>
                         <div style="font-size: 10px; color: #aaa;">Daily Income</div>
                         <div style="color: #66ff66; font-weight: bold;">
                             $${income.toLocaleString()}
+                            ${this.systems.bases.getBaseEfficiencyBonus(base) > 0 ? `<br><span style="color: #ffff00; font-size: 9px;">+${Math.round(this.systems.bases.getBaseEfficiencyBonus(base) * 100)}% bonus</span>` : ''}
                         </div>
                     </div>
                     <div>
@@ -163,40 +168,58 @@ export class BasesScreen {
                 <!-- Gang Management -->
                 <div style="background: #1a1a1a; padding: 10px; border-radius: 5px; margin-bottom: 10px;">
                     <div style="font-size: 12px; color: #ffff00; margin-bottom: 8px;">👥 Gang Management</div>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-                        <button onclick="game.screens.bases.assignGang('${city}', 1)" 
+                    <div style="display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; margin-bottom: 8px;">
+                        <input type="number" id="gangQtyInput_${city.replace(/\s+/g, '_')}" value="1" min="1" max="${availableGang}" 
+                               style="width: 60px; text-align: center; padding: 4px; font-size: 11px;" 
+                               ${availableGang === 0 ? 'disabled' : ''}>
+                        <button onclick="game.screens.bases.assignGangWithQty('${city}')" 
                                 class="action-btn" style="padding: 6px; font-size: 11px;" 
-                                ${availableGang === 0 || base.assignedGang >= baseType.gangRequired ? 'disabled' : ''}>
-                            + Assign 1
+                                ${availableGang === 0 ? 'disabled' : ''}>
+                            Assign
                         </button>
-                        <button onclick="game.screens.bases.removeGang('${city}', 1)" 
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center;">
+                        <input type="number" id="removeGangQtyInput_${city.replace(/\s+/g, '_')}" value="1" min="1" max="${base.assignedGang}" 
+                               style="width: 60px; text-align: center; padding: 4px; font-size: 11px;" 
+                               ${base.assignedGang === 0 ? 'disabled' : ''}>
+                        <button onclick="game.screens.bases.removeGangWithQty('${city}')" 
                                 class="action-btn sell" style="padding: 6px; font-size: 11px;" 
                                 ${base.assignedGang === 0 ? 'disabled' : ''}>
-                            - Remove 1
+                            Remove
                         </button>
                     </div>
                     <div style="font-size: 10px; color: #aaa; text-align: center; margin-top: 5px;">
-                        Available: ${availableGang} members
+                        Available: ${availableGang} members | Assigned: ${base.assignedGang}/${baseType.gangRequired}
+                        ${base.assignedGang > baseType.gangRequired ? ` | <span style="color: #66ff66;">+${base.assignedGang - baseType.gangRequired} extra (${Math.round((base.assignedGang - baseType.gangRequired) * 2)}% bonus)</span>` : ''}
                     </div>
                 </div>
                 
                 <!-- Gun Management -->
                 <div style="background: #1a1a1a; padding: 10px; border-radius: 5px; margin-bottom: 10px;">
                     <div style="font-size: 12px; color: #ff6666; margin-bottom: 8px;">🔫 Gun Management</div>
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-                        <button onclick="game.screens.bases.assignGuns('${city}', 1)" 
+                    <div style="display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; margin-bottom: 8px;">
+                        <input type="number" id="gunQtyInput_${city.replace(/\s+/g, '_')}" value="1" min="1" max="${this.state.getAvailableGunsInCity(city)}" 
+                               style="width: 60px; text-align: center; padding: 4px; font-size: 11px;" 
+                               ${this.state.getAvailableGunsInCity(city) === 0 ? 'disabled' : ''}>
+                        <button onclick="game.screens.bases.assignGunsWithQty('${city}')" 
                                 class="action-btn" style="padding: 6px; font-size: 11px;" 
-                                ${this.state.get('guns') === 0 || (base.guns || 0) >= baseType.gunsRequired ? 'disabled' : ''}>
-                            + Assign 1
+                                ${this.state.getAvailableGunsInCity(city) === 0 ? 'disabled' : ''}>
+                            Assign
                         </button>
-                        <button onclick="game.screens.bases.removeGuns('${city}', 1)" 
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center;">
+                        <input type="number" id="removeGunQtyInput_${city.replace(/\s+/g, '_')}" value="1" min="1" max="${base.guns || 0}" 
+                               style="width: 60px; text-align: center; padding: 4px; font-size: 11px;" 
+                               ${(base.guns || 0) === 0 ? 'disabled' : ''}>
+                        <button onclick="game.screens.bases.removeGunsWithQty('${city}')" 
                                 class="action-btn sell" style="padding: 6px; font-size: 11px;" 
                                 ${(base.guns || 0) === 0 ? 'disabled' : ''}>
-                            - Remove 1
+                            Remove
                         </button>
                     </div>
                     <div style="font-size: 10px; color: #aaa; text-align: center; margin-top: 5px;">
-                        Assigned: ${base.guns || 0}/${baseType.gunsRequired} | Available: ${this.state.get('guns')} guns
+                        Assigned: ${base.guns || 0}/${baseType.gunsRequired} | Available in ${city}: ${this.state.getAvailableGunsInCity(city)} guns
+                        ${(base.guns || 0) > baseType.gunsRequired ? ` | <span style="color: #66ff66;">+${(base.guns || 0) - baseType.gunsRequired} extra (${Math.round((base.guns || 0) - baseType.gunsRequired)}% bonus)</span>` : ''}
                     </div>
                 </div>
                 
@@ -210,6 +233,18 @@ export class BasesScreen {
                         🏢 Manage Base Details
                     </button>
                 </div>
+                
+                <!-- Extra Resources Info -->
+                ${base.assignedGang > baseType.gangRequired || (base.guns || 0) > baseType.gunsRequired ? `
+                <div style="background: #1a1a1a; padding: 10px; border-radius: 5px; margin-bottom: 10px; border-left: 3px solid #66ff66;">
+                    <div style="font-size: 11px; color: #66ff66; margin-bottom: 5px;">💪 Extra Resources Benefits:</div>
+                    <div style="font-size: 10px; color: #aaa; line-height: 1.3;">
+                        • Extra gang members: +2% income & +15% defense each<br>
+                        • Extra guns: +1% income & +8% defense each<br>
+                        • Maximum efficiency bonus: 50%
+                    </div>
+                </div>
+                ` : ''}
                 
                 <!-- Actions -->
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
@@ -328,6 +363,66 @@ export class BasesScreen {
         } else if (result.error) {
             this.ui.modals.alert(result.error, 'Remove Guns Failed');
         }
+    }
+    
+    assignGangWithQty(city) {
+        const inputId = `gangQtyInput_${city.replace(/\s+/g, '_')}`;
+        const qtyInput = document.getElementById(inputId);
+        if (!qtyInput) {
+            this.ui.modals.alert('Quantity input not found.', 'Error');
+            return;
+        }
+        const amount = parseInt(qtyInput.value, 10);
+        if (isNaN(amount) || amount < 1) {
+            this.ui.modals.alert('Please enter a valid quantity.', 'Error');
+            return;
+        }
+        this.assignGang(city, amount);
+    }
+    
+    removeGangWithQty(city) {
+        const inputId = `removeGangQtyInput_${city.replace(/\s+/g, '_')}`;
+        const qtyInput = document.getElementById(inputId);
+        if (!qtyInput) {
+            this.ui.modals.alert('Quantity input not found.', 'Error');
+            return;
+        }
+        const amount = parseInt(qtyInput.value, 10);
+        if (isNaN(amount) || amount < 1) {
+            this.ui.modals.alert('Please enter a valid quantity.', 'Error');
+            return;
+        }
+        this.removeGang(city, amount);
+    }
+    
+    assignGunsWithQty(city) {
+        const inputId = `gunQtyInput_${city.replace(/\s+/g, '_')}`;
+        const qtyInput = document.getElementById(inputId);
+        if (!qtyInput) {
+            this.ui.modals.alert('Quantity input not found.', 'Error');
+            return;
+        }
+        const amount = parseInt(qtyInput.value, 10);
+        if (isNaN(amount) || amount < 1) {
+            this.ui.modals.alert('Please enter a valid quantity.', 'Error');
+            return;
+        }
+        this.assignGuns(city, amount);
+    }
+    
+    removeGunsWithQty(city) {
+        const inputId = `removeGunQtyInput_${city.replace(/\s+/g, '_')}`;
+        const qtyInput = document.getElementById(inputId);
+        if (!qtyInput) {
+            this.ui.modals.alert('Quantity input not found.', 'Error');
+            return;
+        }
+        const amount = parseInt(qtyInput.value, 10);
+        if (isNaN(amount) || amount < 1) {
+            this.ui.modals.alert('Please enter a valid quantity.', 'Error');
+            return;
+        }
+        this.removeGuns(city, amount);
     }
     
     collectIncome(city) {
@@ -697,5 +792,32 @@ export class BasesScreen {
                 this.ui.modals.alert(`Test: Would store ${qty} units`, 'Test Store');
             }
         );
+    }
+    
+    getBaseStatusMessage(base) {
+        if (!base.statusDetails) {
+            return '❌ Understaffed';
+        }
+        
+        const details = base.statusDetails;
+        const issues = [];
+        
+        if (!details.hasEnoughGang) {
+            issues.push(`Need ${details.gangRequired - details.assignedGang} more gang`);
+        }
+        if (!details.hasEnoughGuns) {
+            issues.push(`Need ${details.gunsRequired - details.assignedGuns} more guns`);
+        }
+        if (!details.hasDrugs) {
+            issues.push('Need drugs');
+        }
+        
+        if (issues.length === 1) {
+            return `❌ ${issues[0]}`;
+        } else if (issues.length === 2) {
+            return `❌ ${issues[0]} & ${issues[1]}`;
+        } else {
+            return `❌ ${issues[0]}, ${issues[1]} & ${issues[2]}`;
+        }
     }
 }

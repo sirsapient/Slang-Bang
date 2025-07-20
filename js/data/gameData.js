@@ -159,7 +159,8 @@ export const gameData = {
             gunsRequired: 2,
             upgradeCost: 15000, 
             maxInventory: 60, // 10 per drug, 6 drugs
-            maxSafe: 50000 
+            maxSafe: 50000,
+            maxCash: 25000 // Cash available for raiding
         },
         2: { 
             name: 'Safe House', 
@@ -169,7 +170,8 @@ export const gameData = {
             gunsRequired: 4,
             upgradeCost: 40000, 
             maxInventory: 120, // 20 per drug
-            maxSafe: 250000 
+            maxSafe: 250000,
+            maxCash: 50000 // Cash available for raiding
         },
         3: { 
             name: 'Distribution Center', 
@@ -179,7 +181,8 @@ export const gameData = {
             gunsRequired: 6,
             upgradeCost: 100000, 
             maxInventory: 240, // 40 per drug
-            maxSafe: 500000 
+            maxSafe: 500000,
+            maxCash: 100000 // Cash available for raiding
         },
         4: { 
             name: 'Drug Fortress', 
@@ -189,7 +192,8 @@ export const gameData = {
             gunsRequired: 10,
             upgradeCost: null, 
             maxInventory: 480, // 80 per drug
-            maxSafe: 1000000 
+            maxSafe: 1000000,
+            maxCash: 200000 // Cash available for raiding
         }
     },
     
@@ -199,7 +203,8 @@ export const gameData = {
             name: 'Street Dealer', 
             minNetWorth: 0, 
             minBases: 0, 
-            minGang: 0, 
+            minGang: 0,
+            minAssets: 0,
             emoji: '👤', 
             color: '#888888' 
         },
@@ -207,7 +212,8 @@ export const gameData = {
             name: 'Corner Boss', 
             minNetWorth: 25000, 
             minBases: 1, 
-            minGang: 5, 
+            minGang: 5,
+            minAssets: 0,
             emoji: '🔫', 
             color: '#996633' 
         },
@@ -215,7 +221,8 @@ export const gameData = {
             name: 'Block Captain', 
             minNetWorth: 100000, 
             minBases: 2, 
-            minGang: 15, 
+            minGang: 15,
+            minAssets: 0,
             emoji: '👔', 
             color: '#6666ff' 
         },
@@ -223,7 +230,8 @@ export const gameData = {
             name: 'District Chief', 
             minNetWorth: 500000, 
             minBases: 3, 
-            minGang: 30, 
+            minGang: 30,
+            minAssets: 1,
             emoji: '🎯', 
             color: '#9966ff' 
         },
@@ -231,7 +239,8 @@ export const gameData = {
             name: 'City Kingpin', 
             minNetWorth: 1000000, 
             minBases: 5, 
-            minGang: 50, 
+            minGang: 50,
+            minAssets: 3,
             emoji: '👑', 
             color: '#ffaa00' 
         },
@@ -239,7 +248,8 @@ export const gameData = {
             name: 'Drug Lord', 
             minNetWorth: 5000000, 
             minBases: 7, 
-            minGang: 100, 
+            minGang: 100,
+            minAssets: 5,
             emoji: '💎', 
             color: '#ff6600' 
         },
@@ -247,7 +257,8 @@ export const gameData = {
             name: 'Cartel Boss', 
             minNetWorth: 10000000, 
             minBases: 10, 
-            minGang: 200, 
+            minGang: 200,
+            minAssets: 8,
             emoji: '🏆', 
             color: '#ff0066' 
         }
@@ -268,34 +279,48 @@ export const gameData = {
         maxTravelCost: 800,
         travelHeatReduction: 0.4, // 40% warrant reduction
         
-        // Heat settings
-        warrantDecayBase: 0.02, // 2% per day when laying low
-        warrantDecayMax: 0.08, // 8% after 2 weeks
-        raidChanceAtCritical: 0.3, // 30% max raid chance
+        // Heat and warrant settings
+        baseHeatGeneration: 100,
+        heatScalingFactor: 1.2, // Heat increases 20% per rank
+        maxHeatPerRaid: 15000,
         
-        // Gang settings
-        baseGangCost: 2500,
-        gangCostScaling: 0.1, // 10% increase per existing member
-        gangHeatPerMember: 100, // Heat generated per gang member per day
-        gangRecruitHeat: 200, // Heat per recruitment
+        // Raid settings
+        baseRaidSuccessChance: 0.8,
+        raidSuccessScaling: 0.95, // 5% harder per rank
+        raidRewardScaling: 1.1, // 10% more rewards per rank
+        
+        // Gang recruitment scaling
+        baseGangCost: 10000, // Base cost per gang member
+        gangCostScaling: 0.1, // 10% more per gang member
+        gangRecruitHeat: 50,
+        gangHeatPerMember: 10, // Daily heat generated per gang member
+        
+        // Gun settings
+        gunCost: 5000,
         
         // Base settings
-        baseCostModifier: 1.0, // Applied to city heat modifier
-        baseIncomeBonus: 1.5, // When drugs are stocked
+        baseIncomeScaling: 1.15, // 15% more income per rank
+        baseCollectionInterval: 5, // Days between collections
+        baseIncomeBonus: 1.5, // 50% bonus when base has drugs
         
-        // Trading settings
-        maxSupply: 200,
-        minSupply: 0,
-        restockThreshold: 20,
-        restockAmount: [10, 30], // Random between min and max
+        // Market settings
+        priceVolatility: 0.3,
+        maxPriceMultiplier: 3.0,
+        minPriceMultiplier: 0.3,
         
-        // Combat settings
-        gunCost: 1500,
-        gunDefenseBonus: 0.02, // 2% protection per gun (max 40%)
+        // Asset settings
+        assetFlexScoreMultiplier: 1.5, // Flex score increases with rank
+        assetResaleValue: 0.9, // 90% resale value
         
-        // UI settings
-        maxEventLogItems: 50,
-        modalFadeTime: 300
+        // Achievement settings
+        achievementUnlockThresholds: {
+            firstBase: 1,
+            firstRaid: 1,
+            firstAsset: 1,
+            millionaire: 1000000,
+            drugLord: 5000000,
+            cartelBoss: 10000000
+        }
     },
     
     // Gang tiers (for display purposes)

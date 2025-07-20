@@ -36,7 +36,7 @@ export class InventoryScreen {
                 </div>
             </div>
             
-            <div id="inventoryList">
+            <div id="inventoryList" style="padding-bottom: 80px;">
                 ${this.renderInventory()}
             </div>
         `;
@@ -45,8 +45,10 @@ export class InventoryScreen {
     renderInventory() {
         const inventory = this.state.get('inventory');
         const totalItems = this.state.getTotalInventory();
+        const gunsByCity = this.state.data.gunsByCity || {};
+        const totalGuns = Object.values(gunsByCity).reduce((sum, guns) => sum + guns, 0);
         
-        if (totalItems === 0) {
+        if (totalItems === 0 && totalGuns === 0) {
             return `
                 <div style="background: #222; border: 1px solid #444; border-radius: 10px; 
                             padding: 30px; text-align: center;">
@@ -55,7 +57,7 @@ export class InventoryScreen {
                         Your inventory is empty
                     </div>
                     <div style="font-size: 12px; color: #666; margin-bottom: 20px;">
-                        Buy some drugs to start building your empire
+                        Buy some drugs or guns to start building your empire
                     </div>
                     <button onclick="game.showScreen('market')" class="action-btn" style="padding: 12px 20px;">
                         💊 Go to Market
@@ -74,13 +76,17 @@ export class InventoryScreen {
             }
         });
         
+        // Add gun value (using config gun cost as base value)
+        const gunCost = this.game.data.config.gunCost;
+        totalValue += totalGuns * gunCost;
+        
         let content = `
             <div style="background: #333; border: 1px solid #666; border-radius: 10px; 
                         padding: 15px; margin-bottom: 20px; text-align: center;">
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
                     <div>
                         <div style="font-size: 12px; color: #aaa; margin-bottom: 5px;">📦 Total Items</div>
-                        <div style="font-size: 18px; color: #ffff00; font-weight: bold;">${totalItems}</div>
+                        <div style="font-size: 18px; color: #ffff00; font-weight: bold;">${totalItems + totalGuns}</div>
                     </div>
                     <div>
                         <div style="font-size: 12px; color: #aaa; margin-bottom: 5px;">💎 Total Value</div>
@@ -119,6 +125,46 @@ export class InventoryScreen {
                 `;
             }
         });
+        
+        // Guns section
+        if (totalGuns > 0) {
+            content += `
+                <div style="background: #222; border: 1px solid #444; border-radius: 10px; 
+                            padding: 15px; margin-bottom: 15px;">
+                    <div style="font-size: 16px; color: #ff6666; font-weight: bold; margin-bottom: 10px;">
+                        🔫 Guns
+                    </div>
+            `;
+            
+            Object.entries(gunsByCity).forEach(([city, guns]) => {
+                if (guns > 0) {
+                    const availableGuns = this.state.getAvailableGunsInCity(city);
+                    const assignedGuns = guns - availableGuns;
+                    
+                    content += `
+                        <div style="background: #333; border: 1px solid #555; border-radius: 8px; 
+                                    padding: 10px; margin-bottom: 8px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <div>
+                                    <div style="font-weight: bold; color: #ffff00;">${city}</div>
+                                    <div style="font-size: 11px; color: #aaa;">
+                                        ${availableGuns} available${assignedGuns > 0 ? `, ${assignedGuns} assigned` : ''}
+                                    </div>
+                                </div>
+                                <div style="color: #ff6666; font-weight: bold; font-size: 18px;">
+                                    ${guns} guns
+                                </div>
+                            </div>
+                            <div style="font-size: 11px; color: #aaa; margin-top: 5px;">
+                                Value: $${(guns * gunCost).toLocaleString()}
+                            </div>
+                        </div>
+                    `;
+                }
+            });
+            
+            content += `</div>`;
+        }
         
         return content;
     }

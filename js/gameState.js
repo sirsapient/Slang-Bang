@@ -45,7 +45,27 @@ export class GameState {
             
             // Meta
             saveVersion: '1.0',
-            lastSaved: Date.now()
+            lastSaved: Date.now(),
+            
+            // Notifications
+            notifications: [],
+            
+            // Achievements
+            achievements: {
+                unlocked: [],
+                progress: {
+                    totalRaids: 0,
+                    successfulRaids: 0,
+                    totalEarnings: 0,
+                    basesOwned: 0,
+                    assetsOwned: 0,
+                    drugsSold: 0,
+                    daysSurvived: 0,
+                    citiesVisited: 0,
+                    maxNetWorth: 0,
+                    maxHeatSurvived: 0
+                }
+            }
         };
         
         // Runtime data (not saved)
@@ -69,7 +89,7 @@ export class GameState {
         // Special handling for cash to prevent NaN
         if (key === 'cash') {
             if (value === undefined || value === null || isNaN(value)) {
-                console.warn('Invalid cash value detected, resetting to 0:', value);
+                console.warn('Invalid cash value detected, resetting to 0:', value, new Error().stack);
                 this.data.cash = 0;
                 return 0;
             }
@@ -79,6 +99,9 @@ export class GameState {
     }
     
     set(key, value) {
+        if (key === 'cash') {
+            console.log('[CASH DEBUG][SET] set cash:', value, new Error().stack);
+        }
         this.data[key] = value;
         this.emit('stateChange', { key, value });
         this.emit(`${key}Changed`, value);
@@ -97,7 +120,10 @@ export class GameState {
     
     // Cash management
     updateCash(amount) {
-        this.data.cash = Math.max(0, this.data.cash + amount);
+        const oldCash = this.data.cash;
+        const newCash = Math.max(0, oldCash + amount);
+        console.log(`[CASH DEBUG][UPDATE] updateCash called: oldCash=${oldCash}, amount=${amount}, newCash=${newCash}`, new Error().stack);
+        this.data.cash = newCash;
         this.emit('cashChanged', this.data.cash);
         this.emit('stateChange', { key: 'cash', value: this.data.cash });
     }
@@ -128,6 +154,13 @@ export class GameState {
         this.data.gangMembers[city] += amount;
         this.data.gangSize += amount;
         console.log(`Gang members after adding: ${this.data.gangMembers[city]} in ${city}, total: ${this.data.gangSize}`);
+        
+        // Debug logging for Austin
+        if (city === 'Austin') {
+            console.log(`[DEBUG] Austin gang members updated: ${this.data.gangMembers[city]}`);
+            console.log(`[DEBUG] All gang members after update:`, this.data.gangMembers);
+        }
+        
         this.emit('gangChanged', this.data.gangSize);
         this.emit('gangMembersChanged', { city, amount: this.data.gangMembers[city] });
         this.emit('stateChange', { key: 'gangMembers', value: { ...this.data.gangMembers } });
@@ -149,20 +182,34 @@ export class GameState {
         
         const available = Math.max(0, totalInCity - assignedInCity);
         
+        // Debug logging for Austin
+        if (city === 'Austin') {
+            console.log(`[DEBUG] Austin gang members: total=${totalInCity}, assigned=${assignedInCity}, available=${available}`);
+            console.log(`[DEBUG] Austin base:`, base);
+            console.log(`[DEBUG] All gang members:`, this.data.gangMembers);
+        }
+        
         return available;
     }
     
     removeGangMembersFromCity(city, amount) {
+        console.log(`removeGangMembersFromCity called: city=${city}, amount=${amount}`);
+        console.log(`Current gang members in ${city}:`, this.data.gangMembers[city]);
+        
         if (!this.data.gangMembers[city] || this.data.gangMembers[city] < amount) {
+            console.log(`Cannot remove ${amount} from ${city}, only have ${this.data.gangMembers[city]}`);
             return false;
         }
         
         this.data.gangMembers[city] -= amount;
         this.data.gangSize -= amount;
         
+        console.log(`After removal: ${this.data.gangMembers[city]} in ${city}, total: ${this.data.gangSize}`);
+        
         // If no more gang members in this city, remove the city entry
         if (this.data.gangMembers[city] <= 0) {
             delete this.data.gangMembers[city];
+            console.log(`Removed ${city} from gangMembers object`);
         }
         
         this.emit('gangChanged', this.data.gangSize);
@@ -279,6 +326,12 @@ export class GameState {
     
     // Save/Load functionality
     save() {
+        // Validate cash before saving
+        if (this.data.cash === undefined || this.data.cash === null || isNaN(this.data.cash)) {
+            console.warn('Invalid cash value detected before saving, resetting to 5000:', this.data.cash, new Error().stack);
+            this.data.cash = 5000;
+        }
+        console.log('[CASH DEBUG][SAVE] cash value before saving:', this.data.cash, new Error().stack);
         const saveData = {
             gameState: this.data,
             cityPrices: this.cityPrices,
@@ -321,10 +374,10 @@ export class GameState {
                 
                 // Validate critical values after loading
                 if (this.data.cash === undefined || this.data.cash === null || isNaN(this.data.cash)) {
-                    console.warn('Invalid cash value in save data, resetting to 5000:', this.data.cash);
+                    console.warn('Invalid cash value in save data, resetting to 5000:', this.data.cash, new Error().stack);
                     this.data.cash = 5000;
                 }
-                
+                console.log('[CASH DEBUG][LOAD] cash value after loading:', this.data.cash, new Error().stack);
                 console.log('Game loaded');
                 this.emit('gameLoaded');
                 this.emit('stateChange', { key: 'load', value: true });
@@ -423,6 +476,105 @@ export class GameState {
         return this.raidLossHistory
             .filter(entry => entry.time >= cutoff)
             .reduce((sum, entry) => sum + entry.amount, 0);
+    }
+    
+    // Notification management
+    addNotification(message, type = 'info', duration = 4000) {
+        const notification = {
+            id: Date.now() + Math.random(),
+            message: message,
+            type: type, // 'info', 'success', 'warning', 'error'
+            timestamp: Date.now(),
+            day: this.get('day'),
+            read: false
+        };
+        
+        this.data.notifications.unshift(notification);
+        
+        // Keep only last 100 notifications
+        if (this.data.notifications.length > 100) {
+            this.data.notifications = this.data.notifications.slice(0, 100);
+        }
+        
+        this.emit('notificationAdded', notification);
+        this.emit('stateChange', { key: 'notifications', value: [...this.data.notifications] });
+        
+        return notification;
+    }
+    
+    getNotifications() {
+        return this.data.notifications;
+    }
+    
+    getUnreadNotifications() {
+        return this.data.notifications.filter(n => !n.read);
+    }
+    
+    markNotificationAsRead(notificationId) {
+        const notification = this.data.notifications.find(n => n.id === notificationId);
+        if (notification) {
+            notification.read = true;
+            this.emit('notificationRead', notification);
+            this.emit('stateChange', { key: 'notifications', value: [...this.data.notifications] });
+        }
+    }
+    
+    markAllNotificationsAsRead() {
+        this.data.notifications.forEach(n => n.read = true);
+        this.emit('notificationsRead');
+        this.emit('stateChange', { key: 'notifications', value: [...this.data.notifications] });
+    }
+    
+    clearNotifications() {
+        this.data.notifications = [];
+        this.emit('notificationsCleared');
+        this.emit('stateChange', { key: 'notifications', value: [] });
+    }
+    
+    // Achievement system
+    trackAchievement(achievementId, value = 1) {
+        if (!this.data.achievements.progress[achievementId]) {
+            this.data.achievements.progress[achievementId] = 0;
+        }
+        this.data.achievements.progress[achievementId] += value;
+        this.checkAchievements();
+    }
+    
+    checkAchievements() {
+        const progress = this.data.achievements.progress;
+        const unlocked = this.data.achievements.unlocked;
+        
+        // Check for new achievements
+        const achievements = [
+            { id: 'firstBase', condition: () => progress.basesOwned >= 1, name: '🏠 First Base', description: 'Purchase your first base' },
+            { id: 'firstRaid', condition: () => progress.totalRaids >= 1, name: '⚔️ First Raid', description: 'Conduct your first raid' },
+            { id: 'firstAsset', condition: () => progress.assetsOwned >= 1, name: '💎 First Asset', description: 'Purchase your first asset' },
+            { id: 'millionaire', condition: () => progress.maxNetWorth >= 1000000, name: '💰 Millionaire', description: 'Reach $1M net worth' },
+            { id: 'drugLord', condition: () => progress.maxNetWorth >= 5000000, name: '💎 Drug Lord', description: 'Reach $5M net worth' },
+            { id: 'cartelBoss', condition: () => progress.maxNetWorth >= 10000000, name: '🏆 Cartel Boss', description: 'Reach $10M net worth' },
+            { id: 'raidMaster', condition: () => progress.successfulRaids >= 50, name: '⚔️ Raid Master', description: 'Successfully complete 50 raids' },
+            { id: 'empireBuilder', condition: () => progress.basesOwned >= 10, name: '🏢 Empire Builder', description: 'Own 10 bases' },
+            { id: 'assetCollector', condition: () => progress.assetsOwned >= 20, name: '💎 Asset Collector', description: 'Own 20 assets' },
+            { id: 'survivor', condition: () => progress.daysSurvived >= 100, name: '🕊️ Survivor', description: 'Survive 100 days' },
+            { id: 'heatMaster', condition: () => progress.maxHeatSurvived >= 50000, name: '🔥 Heat Master', description: 'Survive with 50K+ warrant' },
+            { id: 'traveler', condition: () => progress.citiesVisited >= 8, name: '✈️ Traveler', description: 'Visit 8 different cities' }
+        ];
+        
+        achievements.forEach(achievement => {
+            if (!unlocked.includes(achievement.id) && achievement.condition()) {
+                unlocked.push(achievement.id);
+                this.addNotification(`🏆 ${achievement.name}: ${achievement.description}`, 'success');
+                this.emit('achievementUnlocked', achievement.id); // New event for achievement unlock
+                this.emit('stateChange', { key: 'achievements', value: { ...this.data.achievements } });
+            }
+        });
+    }
+    
+    getAchievements() {
+        return {
+            unlocked: this.data.achievements.unlocked,
+            progress: this.data.achievements.progress
+        };
     }
 }
 
