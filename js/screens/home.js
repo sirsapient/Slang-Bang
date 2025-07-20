@@ -236,22 +236,36 @@ export class HomeScreen {
         const quantity = parseInt(document.getElementById('quickBuyGuns').value) || 0;
         const cost = quantity * this.game.data.config.gunCost;
         const currentCity = this.state.get('currentCity');
-        if (quantity <= 0) return;
+        
+        console.log('quickBuyGuns called:', { quantity, cost, currentCity });
+        
+        if (quantity <= 0) {
+            console.log('Quantity is 0 or invalid, returning');
+            return;
+        }
+        
+        console.log('Showing confirmation modal for guns...');
         
         // Show confirm modal directly without closing first
         this.ui.modals.confirm(
             `Buy ${quantity} guns in ${currentCity} for $${cost.toLocaleString()}?`,
             () => {
+                console.log('Gun purchase confirmed!');
                 if (this.state.canAfford(cost)) {
+                    console.log('Can afford, processing purchase...');
                     this.state.updateCash(-cost);
                     this.state.addGunsToCity(currentCity, quantity);
                     this.ui.events.add(`Purchased ${quantity} guns in ${currentCity} for $${cost.toLocaleString()}`, 'good');
                     this.refreshQuickBuyModal();
+                    console.log('Gun purchase completed successfully');
                 } else {
+                    console.log('Cannot afford guns');
                     this.ui.modals.alert('Not enough cash for this purchase!', 'Purchase Failed');
                 }
             },
-            null
+            () => {
+                console.log('Gun purchase cancelled');
+            }
         );
     }
     
@@ -261,24 +275,38 @@ export class HomeScreen {
         const cost = quantity * costPer;
         const heat = quantity * this.game.data.config.gangRecruitHeat;
         const currentCity = this.state.get('currentCity');
-        if (quantity <= 0) return;
+        
+        console.log('quickBuyGang called:', { quantity, costPer, cost, heat, currentCity });
+        
+        if (quantity <= 0) {
+            console.log('Quantity is 0 or invalid, returning');
+            return;
+        }
+        
+        console.log('Showing confirmation modal for gang members...');
         
         // Show confirm modal directly without closing first
         this.ui.modals.confirm(
             `Recruit ${quantity} gang members in ${currentCity} for $${cost.toLocaleString()}?<br><small>Heat will increase by ${heat.toLocaleString()}</small>`,
             () => {
+                console.log('Gang member purchase confirmed!');
                 if (this.state.canAfford(cost)) {
+                    console.log('Can afford, processing purchase...');
                     this.state.updateCash(-cost);
                     this.state.addGangMembers(currentCity, quantity);
                     this.state.updateWarrant(heat);
                     this.ui.events.add(`Recruited ${quantity} gang members in ${currentCity} for $${cost.toLocaleString()}`, 'good');
                     this.ui.events.add(`Gang recruitment increased heat by ${heat.toLocaleString()}`, 'bad');
                     this.refreshQuickBuyModal();
+                    console.log('Gang member purchase completed successfully');
                 } else {
+                    console.log('Cannot afford gang members');
                     this.ui.modals.alert('Not enough cash for this purchase!', 'Purchase Failed');
                 }
             },
-            null
+            () => {
+                console.log('Gang member purchase cancelled');
+            }
         );
     }
     
