@@ -1,10 +1,4 @@
 // js/main.js - Main game controller and initialization
-console.log('Main.js loading...');
-
-// Test import
-import { test } from './test.js';
-console.log('Test import successful:', test);
-
 import { gameState } from './gameState.js';
 import { gameData } from './data/gameData.js';
 import { HomeScreen } from './screens/home.js';
@@ -65,8 +59,9 @@ class Game {
         this.screens.raid = new RaidScreen(this);
         this.screens.mail = new MailScreen(this);
         
-        // Set up navigation
+        // Set up navigation and global event delegation
         this.setupNavigation();
+        this.setupGlobalEventDelegation();
         
         // Set up phone time
         updatePhoneTime();
@@ -90,18 +85,69 @@ class Game {
     }
     
     setupNavigation() {
-        // Handle navigation clicks (only for Home, Market, Travel)
-        document.querySelectorAll('.nav-item').forEach(item => {
-            const screenName = item.dataset.screen;
-            if (["home", "market", "travel"].includes(screenName)) {
-                item.addEventListener('click', () => {
+        // Use event delegation for navigation
+        document.addEventListener('click', (event) => {
+            const navItem = event.target.closest('.nav-item');
+            if (navItem) {
+                const screenName = navItem.dataset.screen;
+                if (["home", "market", "travel"].includes(screenName)) {
                     this.showScreen(screenName);
-                });
+                }
             }
         });
+        
         // Listen for screen change requests from other components
         this.state.on('navigateTo', (screenName) => {
             this.showScreen(screenName);
+        });
+    }
+    
+    setupGlobalEventDelegation() {
+        // Track last click time to prevent rapid clicking
+        let lastClickTime = 0;
+        const CLICK_DEBOUNCE = 300; // 300ms debounce
+        
+        // Global event delegation for all button clicks
+        document.addEventListener('click', (event) => {
+            const now = Date.now();
+            if (now - lastClickTime < CLICK_DEBOUNCE) {
+                event.preventDefault();
+                event.stopPropagation();
+                return; // Ignore rapid clicks
+            }
+            lastClickTime = now;
+            
+            const target = event.target;
+            
+            // Handle app-icon clicks
+            if (target.closest('.app-icon')) {
+                const appIcon = target.closest('.app-icon');
+                const onclick = appIcon.getAttribute('onclick');
+                if (onclick) {
+                    // Remove the onclick attribute to prevent double execution
+                    appIcon.removeAttribute('onclick');
+                    // Execute the onclick code
+                    try {
+                        eval(onclick);
+                    } catch (error) {
+                        console.error('Error executing onclick:', error);
+                    }
+                }
+            }
+            
+            // Handle action-btn clicks
+            if (target.closest('.action-btn')) {
+                const actionBtn = target.closest('.action-btn');
+                const onclick = actionBtn.getAttribute('onclick');
+                if (onclick) {
+                    actionBtn.removeAttribute('onclick');
+                    try {
+                        eval(onclick);
+                    } catch (error) {
+                        console.error('Error executing action button onclick:', error);
+                    }
+                }
+            }
         });
     }
     
@@ -130,6 +176,19 @@ class Game {
         // Update state
         this.currentScreen = screen;
         this.state.set('currentScreen', screenName);
+        
+        // Force a small delay to ensure DOM is updated
+        setTimeout(() => {
+            this.refreshEventListeners();
+        }, 10);
+    }
+    
+    refreshEventListeners() {
+        // Re-attach any specific event listeners that might have been lost
+        const currentScreen = this.currentScreen;
+        if (currentScreen && currentScreen.refreshEventListeners) {
+            currentScreen.refreshEventListeners();
+        }
     }
     
     startAutoSave() {
