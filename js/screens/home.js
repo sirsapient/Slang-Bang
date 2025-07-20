@@ -188,6 +188,8 @@ export class HomeScreen {
             this.quickBuyModal.content = this.renderQuickBuyContent();
         }
         this.quickBuyModal.show();
+        this.attachQuickBuyListeners();
+        this.attachModalCloseListener();
     }
 
     renderQuickBuyContent() {
