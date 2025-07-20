@@ -122,6 +122,12 @@ export class GameState {
     updateCash(amount) {
         const oldCash = this.data.cash;
         const newCash = Math.max(0, oldCash + amount);
+        
+        // Debug logging for cash changes
+        if (amount < 0 && Math.abs(amount) > 1000) {
+            console.warn(`[CASH DEBUG][LARGE LOSS] Large cash loss detected: oldCash=${oldCash}, amount=${amount}, newCash=${newCash}`, new Error().stack);
+        }
+        
         console.log(`[CASH DEBUG][UPDATE] updateCash called: oldCash=${oldCash}, amount=${amount}, newCash=${newCash}`, new Error().stack);
         this.data.cash = newCash;
         this.emit('cashChanged', this.data.cash);
@@ -377,6 +383,14 @@ export class GameState {
                     console.warn('Invalid cash value in save data, resetting to 5000:', this.data.cash, new Error().stack);
                     this.data.cash = 5000;
                 }
+                
+                // If cash is 0 but player has been playing (day > 1), give them some money back
+                if (this.data.cash === 0 && this.data.day > 1) {
+                    console.warn('Cash is 0 but player has been playing (day ' + this.data.day + '), restoring to 10000');
+                    this.data.cash = 10000;
+                    this.addNotification('💰 Cash restored to $10,000 due to save data issue', 'success');
+                }
+                
                 console.log('[CASH DEBUG][LOAD] cash value after loading:', this.data.cash, new Error().stack);
                 console.log('Game loaded');
                 this.emit('gameLoaded');
@@ -529,6 +543,15 @@ export class GameState {
         this.data.notifications = [];
         this.emit('notificationsCleared');
         this.emit('stateChange', { key: 'notifications', value: [] });
+    }
+    
+    // Emergency save data reset
+    resetSaveData() {
+        localStorage.removeItem('slangBangSave');
+        window.gameSaveData = null;
+        console.log('Save data cleared');
+        this.addNotification('🔄 Save data reset - starting fresh game', 'info');
+        location.reload();
     }
     
     // Achievement system
