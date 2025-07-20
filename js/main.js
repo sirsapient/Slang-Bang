@@ -161,6 +161,10 @@ class Game {
     }
     
     showScreen(screenName) {
+        // Always close any open modal before navigating
+        if (this.ui && this.ui.modals && typeof this.ui.modals.close === 'function') {
+            this.ui.modals.close();
+        }
         console.log(`showScreen called with: ${screenName}`);
         
         // Update nav bar
