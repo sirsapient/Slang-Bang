@@ -47,6 +47,17 @@
     <div id="modalContainer"></div>
 
     <!-- Load JavaScript Modules -->
+    <script src="js/main-simple.js"></script>
     <script type="module" src="js/main.js"></script>
+    <script nomodule>
+        // Fallback for browsers that don't support ES6 modules
+        document.getElementById('screenContainer').innerHTML = `
+            <div style="color: #ff0000; padding: 20px; text-align: center;">
+                <h2>Browser Compatibility Error</h2>
+                <p>This game requires a modern browser that supports ES6 modules.</p>
+                <p>Please update your browser or try a different one.</p>
+            </div>
+        `;
+    </script>
 </body>
 </html>

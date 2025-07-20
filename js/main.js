@@ -1,4 +1,10 @@
 // js/main.js - Main game controller and initialization
+console.log('Main.js loading...');
+
+// Test import
+import { test } from './test.js';
+console.log('Test import successful:', test);
+
 import { gameState } from './gameState.js';
 import { gameData } from './data/gameData.js';
 import { HomeScreen } from './screens/home.js';
