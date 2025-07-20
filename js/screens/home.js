@@ -189,8 +189,6 @@ export class HomeScreen {
     renderQuickBuyContent() {
         const gunCost = this.game.data.config.gunCost;
         const gangCost = this.calculateGangMemberCost();
-        const baseCost = this.systems.bases.calculateBaseCost(this.state.get('currentCity'));
-        const hasBase = this.state.hasBase(this.state.get('currentCity'));
         const cash = this.state.get('cash');
         const safeCash = (cash !== undefined && cash !== null && !isNaN(cash)) ? cash : 0;
         
@@ -230,22 +228,7 @@ export class HomeScreen {
                 </div>
             </div>
             
-            <!-- Base -->
-            <div style="background: #222; border: 1px solid #444; border-radius: 10px; padding: 15px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                    <div style="font-weight: bold;">🏢 Base in ${this.state.get('currentCity')}</div>
-                    <div style="color: #66ff66;">$${baseCost.toLocaleString()}</div>
-                </div>
-                <button 
-                    onclick="game.screens.home.quickBuyBase()" 
-                    class="action-btn" 
-                    style="width: 100%;"
-                    ${hasBase || cash < baseCost || this.state.get('gangSize') < 4 ? 'disabled' : ''}>
-                    ${hasBase ? 'Already Owned' : 
-                      this.state.get('gangSize') < 4 ? 'Need 4+ Gang' :
-                      cash < baseCost ? 'Cannot Afford' : 'Purchase Base'}
-                </button>
-            </div>
+
         `;
     }
     
@@ -310,24 +293,7 @@ export class HomeScreen {
         }
     }
     
-    quickBuyBase() {
-        const city = this.state.get('currentCity');
-        const baseCost = this.systems.bases.calculateBaseCost(city);
-        
-        this.ui.modals.confirm(
-            `Purchase a base in ${city} for $${baseCost.toLocaleString()}?`,
-            () => {
-                if (this.systems.bases.purchaseBase(city)) {
-                    // Close the quick buy modal after successful purchase
-                    this.ui.modals.close();
-                    this.refresh();
-                } else {
-                    this.ui.modals.alert('Could not purchase base. You may already own a base here, lack enough cash, or need at least 4 gang members.', 'Purchase Failed');
-                }
-            },
-            null
-        );
-    }
+
     
     calculateGangMemberCost() {
         const baseCost = this.game.data.config.baseGangCost || 10000;
