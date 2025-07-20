@@ -154,22 +154,30 @@ export class GameState {
     // City-based gang management
     addGangMembers(city, amount) {
         console.log(`addGangMembers called: city=${city}, amount=${amount}`);
+        console.log(`Before adding - gangMembers:`, this.data.gangMembers);
+        console.log(`Before adding - gangSize:`, this.data.gangSize);
+        
         if (!this.data.gangMembers[city]) {
             this.data.gangMembers[city] = 0;
         }
         this.data.gangMembers[city] += amount;
-        this.data.gangSize += amount;
-        console.log(`Gang members after adding: ${this.data.gangMembers[city]} in ${city}, total: ${this.data.gangSize}`);
         
-        // Debug logging for Austin
-        if (city === 'Austin') {
-            console.log(`[DEBUG] Austin gang members updated: ${this.data.gangMembers[city]}`);
-            console.log(`[DEBUG] All gang members after update:`, this.data.gangMembers);
-        }
+        // Recalculate total gang size from city data
+        this.recalculateGangSize();
+        
+        console.log(`After adding - gangMembers:`, this.data.gangMembers);
+        console.log(`After adding - gangSize:`, this.data.gangSize);
+        console.log(`Gang members after adding: ${this.data.gangMembers[city]} in ${city}, total: ${this.data.gangSize}`);
         
         this.emit('gangChanged', this.data.gangSize);
         this.emit('gangMembersChanged', { city, amount: this.data.gangMembers[city] });
         this.emit('stateChange', { key: 'gangMembers', value: { ...this.data.gangMembers } });
+    }
+    
+    recalculateGangSize() {
+        const totalGangMembers = Object.values(this.data.gangMembers).reduce((sum, count) => sum + count, 0);
+        this.data.gangSize = totalGangMembers;
+        console.log(`Recalculated gang size: ${this.data.gangSize} from city data:`, this.data.gangMembers);
     }
     
     getGangMembersInCity(city) {
@@ -208,15 +216,17 @@ export class GameState {
         }
         
         this.data.gangMembers[city] -= amount;
-        this.data.gangSize -= amount;
-        
-        console.log(`After removal: ${this.data.gangMembers[city]} in ${city}, total: ${this.data.gangSize}`);
         
         // If no more gang members in this city, remove the city entry
         if (this.data.gangMembers[city] <= 0) {
             delete this.data.gangMembers[city];
             console.log(`Removed ${city} from gangMembers object`);
         }
+        
+        // Recalculate total gang size from city data
+        this.recalculateGangSize();
+        
+        console.log(`After removal: ${this.data.gangMembers[city] || 0} in ${city}, total: ${this.data.gangSize}`);
         
         this.emit('gangChanged', this.data.gangSize);
         this.emit('gangMembersChanged', { city, amount: this.data.gangMembers[city] || 0 });
@@ -392,6 +402,10 @@ export class GameState {
                 }
                 
                 console.log('[CASH DEBUG][LOAD] cash value after loading:', this.data.cash, new Error().stack);
+                
+                // Recalculate gang size from city data to ensure consistency
+                this.recalculateGangSize();
+                
                 console.log('Game loaded');
                 this.emit('gameLoaded');
                 this.emit('stateChange', { key: 'load', value: true });
