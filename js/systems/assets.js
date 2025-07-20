@@ -11,12 +11,20 @@ export class AssetSystem {
     }
 
     /**
-     * Check if player has unlocked assets (Rank 4+)
+     * Check if player has unlocked assets (Rank 4+ for cars/properties, but jewelry available from start)
      * @returns {boolean}
      */
     isUnlocked() {
         const rankId = this.getCurrentPlayerRank();
         return rankId >= 4;
+    }
+    
+    /**
+     * Check if jewelry is unlocked (available from start)
+     * @returns {boolean}
+     */
+    isJewelryUnlocked() {
+        return true; // Jewelry is always available
     }
 
     /**
@@ -139,9 +147,18 @@ export class AssetSystem {
         if (!asset) {
             return { success: false, error: 'Asset not found' };
         }
-        if (!this.isUnlocked()) {
-            return { success: false, error: 'Asset Store unlocks at Rank 4 (District Chief)' };
+        
+        // Check if asset type is unlocked
+        if (asset.type === 'jewelry') {
+            if (!this.isJewelryUnlocked()) {
+                return { success: false, error: 'Jewelry store is not available' };
+            }
+        } else {
+            if (!this.isUnlocked()) {
+                return { success: false, error: 'Asset Store unlocks at Rank 4 (District Chief)' };
+            }
         }
+        
         if (!this.state.canAfford(asset.cost)) {
             return { success: false, error: `Can't afford ${asset.name}. Need ${formatCurrency(asset.cost)}` };
         }

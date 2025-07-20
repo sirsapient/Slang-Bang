@@ -9,8 +9,11 @@ export class AssetsScreen {
     }
     
     render() {
-        if (!this.systems.assets.isUnlocked()) {
-            // Just show a static locked message, no alert or getCurrentPlayerRank call
+        const isAssetsUnlocked = this.systems.assets.isUnlocked();
+        const isJewelryUnlocked = this.systems.assets.isJewelryUnlocked();
+        
+        // If nothing is unlocked, show locked screen
+        if (!isAssetsUnlocked && !isJewelryUnlocked) {
             return `
                 <div class="screen-header">
                     <button class="back-button" onclick="game.showScreen('home')">← Back</button>
@@ -62,27 +65,33 @@ export class AssetsScreen {
             </div>
             
             <!-- Tab Navigation -->
-            <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-bottom: 20px;">
-                <button onclick="game.screens.assets.switchTab('exclusive')" 
-                        class="tab-btn ${this.activeTab === 'exclusive' ? 'active' : ''}"
-                        style="padding: 10px; border-radius: 8px; font-size: 12px;">
-                    🌟 Exclusive
-                </button>
-                <button onclick="game.screens.assets.switchTab('jewelry')" 
-                        class="tab-btn ${this.activeTab === 'jewelry' ? 'active' : ''}"
-                        style="padding: 10px; border-radius: 8px; font-size: 12px;">
-                    💍 Jewelry
-                </button>
-                <button onclick="game.screens.assets.switchTab('cars')" 
-                        class="tab-btn ${this.activeTab === 'cars' ? 'active' : ''}"
-                        style="padding: 10px; border-radius: 8px; font-size: 12px;">
-                    🚗 Cars
-                </button>
-                <button onclick="game.screens.assets.switchTab('property')" 
-                        class="tab-btn ${this.activeTab === 'property' ? 'active' : ''}"
-                        style="padding: 10px; border-radius: 8px; font-size: 12px;">
-                    🏠 Property
-                </button>
+            <div style="display: grid; grid-template-columns: repeat(${this.getAvailableTabCount()}, 1fr); gap: 8px; margin-bottom: 20px;">
+                ${isAssetsUnlocked ? `
+                    <button onclick="game.screens.assets.switchTab('exclusive')" 
+                            class="tab-btn ${this.activeTab === 'exclusive' ? 'active' : ''}"
+                            style="padding: 10px; border-radius: 8px; font-size: 12px;">
+                        🌟 Exclusive
+                    </button>
+                ` : ''}
+                ${isJewelryUnlocked ? `
+                    <button onclick="game.screens.assets.switchTab('jewelry')" 
+                            class="tab-btn ${this.activeTab === 'jewelry' ? 'active' : ''}"
+                            style="padding: 10px; border-radius: 8px; font-size: 12px;">
+                        💍 Jewelry
+                    </button>
+                ` : ''}
+                ${isAssetsUnlocked ? `
+                    <button onclick="game.screens.assets.switchTab('cars')" 
+                            class="tab-btn ${this.activeTab === 'cars' ? 'active' : ''}"
+                            style="padding: 10px; border-radius: 8px; font-size: 12px;">
+                        🚗 Cars
+                    </button>
+                    <button onclick="game.screens.assets.switchTab('property')" 
+                            class="tab-btn ${this.activeTab === 'property' ? 'active' : ''}"
+                            style="padding: 10px; border-radius: 8px; font-size: 12px;">
+                        🏠 Property
+                    </button>
+                ` : ''}
                 <button onclick="game.screens.assets.switchTab('owned')" 
                         class="tab-btn ${this.activeTab === 'owned' ? 'active' : ''}"
                         style="padding: 10px; border-radius: 8px; font-size: 12px;">
@@ -142,20 +151,50 @@ export class AssetsScreen {
     }
     
     renderTabContent() {
+        const isAssetsUnlocked = this.systems.assets.isUnlocked();
+        const isJewelryUnlocked = this.systems.assets.isJewelryUnlocked();
+        
         switch (this.activeTab) {
             case 'exclusive':
+                if (!isAssetsUnlocked) {
+                    return this.renderLockedTab('Exclusive items unlock at Rank 4');
+                }
                 return this.renderExclusiveTab();
             case 'jewelry':
+                if (!isJewelryUnlocked) {
+                    return this.renderLockedTab('Jewelry store is not available');
+                }
                 return this.renderJewelryTab();
             case 'cars':
+                if (!isAssetsUnlocked) {
+                    return this.renderLockedTab('Cars unlock at Rank 4');
+                }
                 return this.renderCarsTab();
             case 'property':
+                if (!isAssetsUnlocked) {
+                    return this.renderLockedTab('Properties unlock at Rank 4');
+                }
                 return this.renderPropertyTab();
             case 'owned':
                 return this.renderOwnedTab();
             default:
                 return '';
         }
+    }
+    
+    renderLockedTab(message) {
+        return `
+            <div style="background: #222; border: 1px solid #ff6666; border-radius: 10px; 
+                        padding: 40px 20px; text-align: center;">
+                <div style="font-size: 48px; margin-bottom: 20px;">🔒</div>
+                <div style="font-size: 16px; color: #ff6666; font-weight: bold; margin-bottom: 10px;">
+                    ${message}
+                </div>
+                <div style="font-size: 12px; color: #aaa;">
+                    Continue building your empire to unlock more assets!
+                </div>
+            </div>
+        `;
     }
     
     renderJewelryTab() {
@@ -505,6 +544,18 @@ export class AssetsScreen {
     onShow() {
         // Ensure assets are initialized
         this.systems.assets.initializeAssets();
+        
+        // Set default tab based on what's available
+        const isAssetsUnlocked = this.systems.assets.isUnlocked();
+        const isJewelryUnlocked = this.systems.assets.isJewelryUnlocked();
+        
+        if (!isAssetsUnlocked && isJewelryUnlocked) {
+            // If only jewelry is available, default to jewelry tab
+            this.activeTab = 'jewelry';
+        } else if (!this.activeTab || (this.activeTab === 'jewelry' && !isJewelryUnlocked)) {
+            // Default to first available tab
+            this.activeTab = 'owned';
+        }
     }
     
     switchTab(tab) {
@@ -519,6 +570,17 @@ export class AssetsScreen {
             btn.classList.remove('active');
         });
         event.target.classList.add('active');
+    }
+    
+    getAvailableTabCount() {
+        const isAssetsUnlocked = this.systems.assets.isUnlocked();
+        const isJewelryUnlocked = this.systems.assets.isJewelryUnlocked();
+        
+        let count = 1; // Always have "Owned" tab
+        if (isAssetsUnlocked) count += 4; // Exclusive, Cars, Property
+        if (isJewelryUnlocked) count += 1; // Jewelry
+        
+        return count;
     }
     
     purchaseAsset(assetId) {
