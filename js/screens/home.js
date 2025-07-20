@@ -180,12 +180,16 @@ export class HomeScreen {
         }
     }
     
-    // Modal: Quick Buy
     showQuickBuyModal() {
-        const modal = this.ui.modals.create('🛒 Quick Buy Assets', this.renderQuickBuyContent());
-        modal.show();
+        // Store modal instance for later updates
+        if (!this.quickBuyModal) {
+            this.quickBuyModal = this.ui.modals.create('🛒 Quick Buy Assets', this.renderQuickBuyContent());
+        } else {
+            this.quickBuyModal.content = this.renderQuickBuyContent();
+        }
+        this.quickBuyModal.show();
     }
-    
+
     renderQuickBuyContent() {
         const gunCost = this.game.data.config.gunCost;
         const gangCost = this.calculateGangMemberCost();
@@ -209,7 +213,7 @@ export class HomeScreen {
                 </div>
                 <div style="display: grid; grid-template-columns: 1fr auto; gap: 8px;">
                     <input type="number" id="quickBuyGuns" value="1" min="1" max="100" class="quantity-input">
-                    <button onclick="game.screens.home.quickBuyGuns()" class="action-btn">Buy</button>
+                    <button id="quickBuyGunsBtn" class="action-btn">Buy</button>
                 </div>
             </div>
             
@@ -224,98 +228,122 @@ export class HomeScreen {
                 </div>
                 <div style="display: grid; grid-template-columns: 1fr auto; gap: 8px;">
                     <input type="number" id="quickBuyGang" value="1" min="1" max="50" class="quantity-input">
-                    <button onclick="game.screens.home.quickBuyGang()" class="action-btn">Buy</button>
+                    <button id="quickBuyGangBtn" class="action-btn">Buy</button>
                 </div>
             </div>
-            
-
         `;
     }
-    
-    quickBuyGuns() {
+
+    // Attach event listeners after modal is shown
+    refreshQuickBuyModal() {
+        if (this.ui.modals.activeModal && this.ui.modals.activeModal.title === '🛒 Quick Buy Assets') {
+            const modalBody = document.querySelector('.modal-body');
+            if (modalBody) {
+                modalBody.innerHTML = this.renderQuickBuyContent();
+                this.attachQuickBuyListeners();
+                this.attachModalCloseListener();
+            }
+        }
+    }
+
+    attachQuickBuyListeners() {
+        const gunsBtn = document.getElementById('quickBuyGunsBtn');
+        const gangBtn = document.getElementById('quickBuyGangBtn');
+        if (gunsBtn) {
+            gunsBtn.onclick = () => this.quickBuyGunsConfirm();
+        }
+        if (gangBtn) {
+            gangBtn.onclick = () => this.quickBuyGangConfirm();
+        }
+    }
+
+    attachModalCloseListener() {
+        // Always re-attach the close button event listener
+        const closeBtn = document.querySelector('.modal-close');
+        if (closeBtn) {
+            closeBtn.onclick = (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                e.stopImmediatePropagation();
+                this.ui.modals.close();
+            };
+        }
+    }
+
+    quickBuyGunsConfirm() {
         const quantity = parseInt(document.getElementById('quickBuyGuns').value) || 0;
         const cost = quantity * this.game.data.config.gunCost;
         const currentCity = this.state.get('currentCity');
-        
-        console.log('quickBuyGuns called:', { quantity, cost, currentCity });
-        
         if (quantity <= 0) {
-            console.log('Quantity is 0 or invalid, returning');
+            this.ui.modals.alert('Enter a valid quantity.', 'Invalid Quantity');
             return;
         }
-        
-        // Check if we can afford it first
         if (!this.state.canAfford(cost)) {
             this.ui.modals.alert('Not enough cash for this purchase!', 'Purchase Failed');
             return;
         }
-        
-        // Use in-game confirmation modal
-        this.ui.modals.confirm(
-            `Buy ${quantity} guns in ${currentCity} for $${cost.toLocaleString()}?`,
-            () => {
-                console.log('Gun purchase confirmed!');
+        // Show confirmation step in the same modal
+        const modalBody = document.querySelector('.modal-body');
+        if (modalBody) {
+            modalBody.innerHTML = `
+                <div style="text-align: center; padding: 20px;">
+                    <p>Buy <b>${quantity}</b> guns in <b>${currentCity}</b> for <b>$${cost.toLocaleString()}</b>?</p>
+                    <button id="confirmGunsPurchase" class="action-btn" style="margin: 0 10px;">Confirm</button>
+                    <button id="cancelGunsPurchase" class="action-btn" style="margin: 0 10px; background: #ff6666;">Cancel</button>
+                </div>
+            `;
+            document.getElementById('confirmGunsPurchase').onclick = () => {
                 this.state.updateCash(-cost);
                 this.state.addGunsToCity(currentCity, quantity);
                 this.ui.events.add(`Purchased ${quantity} guns in ${currentCity} for $${cost.toLocaleString()}`, 'good');
+                // Reset modal to input step after purchase
                 this.refreshQuickBuyModal();
-                // Extra debug
-                console.log('Gun purchase completed successfully, quantity:', quantity, 'guns now in city:', this.state.getGunsInCity(currentCity));
-            },
-            () => {
-                console.log('Gun purchase cancelled');
-            }
-        );
+            };
+            document.getElementById('cancelGunsPurchase').onclick = () => {
+                this.refreshQuickBuyModal();
+            };
+            this.attachModalCloseListener();
+        }
     }
-    
-    quickBuyGang() {
+
+    quickBuyGangConfirm() {
         const quantity = parseInt(document.getElementById('quickBuyGang').value) || 0;
         const costPer = this.calculateGangMemberCost();
         const cost = quantity * costPer;
         const heat = quantity * this.game.data.config.gangRecruitHeat;
         const currentCity = this.state.get('currentCity');
-        
-        console.log('quickBuyGang called:', { quantity, costPer, cost, heat, currentCity });
-        
         if (quantity <= 0) {
-            console.log('Quantity is 0 or invalid, returning');
+            this.ui.modals.alert('Enter a valid quantity.', 'Invalid Quantity');
             return;
         }
-        
-        // Check if we can afford it first
         if (!this.state.canAfford(cost)) {
             this.ui.modals.alert('Not enough cash for this purchase!', 'Purchase Failed');
             return;
         }
-        
-        // Use in-game confirmation modal
-        this.ui.modals.confirm(
-            `Recruit ${quantity} gang members in ${currentCity} for $${cost.toLocaleString()}?<br><small>Heat will increase by ${heat.toLocaleString()}</small>`,
-            () => {
-                console.log('Gang member purchase confirmed!');
+        // Show confirmation step in the same modal
+        const modalBody = document.querySelector('.modal-body');
+        if (modalBody) {
+            modalBody.innerHTML = `
+                <div style="text-align: center; padding: 20px;">
+                    <p>Recruit <b>${quantity}</b> gang members in <b>${currentCity}</b> for <b>$${cost.toLocaleString()}</b>?</p>
+                    <div style="font-size: 12px; color: #aaa; margin-bottom: 10px;">Heat will increase by <b>${heat.toLocaleString()}</b></div>
+                    <button id="confirmGangPurchase" class="action-btn" style="margin: 0 10px;">Confirm</button>
+                    <button id="cancelGangPurchase" class="action-btn" style="margin: 0 10px; background: #ff6666;">Cancel</button>
+                </div>
+            `;
+            document.getElementById('confirmGangPurchase').onclick = () => {
                 this.state.updateCash(-cost);
                 this.state.addGangMembers(currentCity, quantity);
                 this.state.updateWarrant(heat);
                 this.ui.events.add(`Recruited ${quantity} gang members in ${currentCity} for $${cost.toLocaleString()}`, 'good');
                 this.ui.events.add(`Gang recruitment increased heat by ${heat.toLocaleString()}`, 'bad');
+                // Reset modal to input step after purchase
                 this.refreshQuickBuyModal();
-                // Extra debug
-                console.log('Gang member purchase completed successfully, quantity:', quantity, 'gang now in city:', this.state.getGangMembersInCity(currentCity));
-            },
-            () => {
-                console.log('Gang member purchase cancelled');
-            }
-        );
-    }
-    
-    refreshQuickBuyModal() {
-        // Check if we're currently showing the Quick Buy modal
-        if (this.ui.modals.activeModal && this.ui.modals.activeModal.title === '🛒 Quick Buy Assets') {
-            // Update just the modal body content
-            const modalBody = document.querySelector('.modal-body');
-            if (modalBody) {
-                modalBody.innerHTML = this.renderQuickBuyContent();
-            }
+            };
+            document.getElementById('cancelGangPurchase').onclick = () => {
+                this.refreshQuickBuyModal();
+            };
+            this.attachModalCloseListener();
         }
     }
     
