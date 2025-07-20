@@ -506,7 +506,10 @@ export class HomeScreen {
     }
 
     handleAssetsClick() {
-        if (this.systems.assets.isUnlocked()) {
+        const isAssetsUnlocked = this.systems.assets.isUnlocked();
+        const isJewelryUnlocked = this.systems.assets.isJewelryUnlocked();
+        
+        if (isAssetsUnlocked || isJewelryUnlocked) {
             this.game.showScreen('assets');
         } else {
             this.ui.modals.alert('You need to be Rank 4 (District Chief) to access the Asset Store. Keep building your empire!');
