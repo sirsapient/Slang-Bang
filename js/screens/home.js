@@ -76,7 +76,7 @@ export class HomeScreen {
                     <div class="app-name">Quick Buy</div>
                 </div>
                 
-                <div class="app-icon" onclick="game.showScreen('bases')">
+                <div class="app-icon" onclick="console.log('Manage Bases clicked'); game.showScreen('bases');">
                     <div class="app-emoji">🏢</div>
                     <div class="app-name">Manage Bases</div>
                 </div>

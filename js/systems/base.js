@@ -154,6 +154,24 @@ export class BaseSystem {
         
         return Math.floor(baseType.income * efficiency * drugBonus * rankBonus);
     }
+    
+    /**
+     * Get base efficiency bonus percentage.
+     * @param {Object} base
+     * @returns {number}
+     */
+    getBaseEfficiencyBonus(base) {
+        const baseType = this.data.baseTypes[base.level];
+        const extraGang = Math.max(0, base.assignedGang - baseType.gangRequired);
+        const extraGuns = Math.max(0, (base.guns || 0) - baseType.gunsRequired);
+        
+        // Each extra gang member provides 2% bonus
+        const gangBonus = extraGang * 0.02;
+        // Each extra gun provides 1% bonus
+        const gunBonus = extraGuns * 0.01;
+        
+        return gangBonus + gunBonus;
+    }
 
     /**
      * Generate daily income for all bases.

@@ -161,6 +161,8 @@ class Game {
     }
     
     showScreen(screenName) {
+        console.log(`showScreen called with: ${screenName}`);
+        
         // Update nav bar
         document.querySelectorAll('.nav-item').forEach(item => {
             item.classList.toggle('active', item.dataset.screen === screenName);
@@ -173,9 +175,13 @@ class Game {
             return;
         }
         
+        console.log(`Screen found:`, screen);
+        
         // Update container
         const container = document.getElementById('screenContainer');
         container.innerHTML = screen.render();
+        
+        console.log(`Screen rendered, calling onShow`);
         
         // Call screen's onShow method
         if (screen.onShow) {
@@ -190,6 +196,8 @@ class Game {
         setTimeout(() => {
             this.refreshEventListeners();
         }, 10);
+        
+        console.log(`showScreen completed for: ${screenName}`);
     }
     
     refreshEventListeners() {
