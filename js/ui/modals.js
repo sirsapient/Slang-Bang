@@ -183,6 +183,7 @@ export class ModalManager {
             
             // Add click listener with proper event handling
             newCloseBtn.addEventListener('click', (e) => {
+                console.log('Close button clicked');
                 e.preventDefault();
                 e.stopPropagation();
                 e.stopImmediatePropagation();

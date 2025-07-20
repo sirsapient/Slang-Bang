@@ -639,6 +639,12 @@ export class HomeScreen {
         });
         
         let content = `
+            <div style="text-align: right; margin-bottom: 15px;">
+                <button onclick="game.ui.modals.close()" class="action-btn" style="padding: 5px 10px; font-size: 11px; background: #666;">
+                    ✕ Close
+                </button>
+            </div>
+            
             <div style="background: #333; border: 1px solid #666; border-radius: 10px; 
                         padding: 15px; margin-bottom: 20px;">
                 <div style="font-size: 14px; color: #ffff00; margin-bottom: 15px; text-align: center;">
