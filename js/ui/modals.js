@@ -128,63 +128,70 @@ export class ModalManager {
         const cancelBtn = modalElement.querySelector('#modalCancelBtn');
         const closeBtn = modalElement.querySelector('.modal-close');
         
-        console.log('Modal buttons found:', { confirmBtn: !!confirmBtn, cancelBtn: !!cancelBtn, closeBtn: !!closeBtn });
-        console.log('Modal buttons details:', { confirmBtn, cancelBtn, closeBtn });
-        console.log('Modal HTML:', modalElement.innerHTML);
-        console.log('Confirm button found:', confirmBtn ? 'YES' : 'NO');
-        console.log('Cancel button found:', cancelBtn ? 'YES' : 'NO');
-        
         if (confirmBtn) {
-            console.log('Adding click listener to confirm button');
-            console.log('Confirm button element:', confirmBtn);
-            console.log('Confirm button style:', confirmBtn.style);
-            
-            // Test if button is clickable
+            // Ensure button is clickable
             confirmBtn.style.cursor = 'pointer';
             confirmBtn.style.pointerEvents = 'auto';
+            confirmBtn.style.userSelect = 'none';
             
-            // Add both event listener and onclick as backup
-            confirmBtn.addEventListener('click', (e) => {
-                console.log('Confirm button clicked!');
+            // Remove any existing listeners to prevent duplicates
+            const newConfirmBtn = confirmBtn.cloneNode(true);
+            confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
+            
+            // Add click listener with proper event handling
+            newConfirmBtn.addEventListener('click', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
+                e.stopImmediatePropagation();
                 this.handleConfirm();
-            });
+            }, true); // Use capture phase
             
-            // Also add a mousedown listener as backup
-            confirmBtn.addEventListener('mousedown', (e) => {
-                console.log('Confirm button mousedown!');
-            });
-            
-            // Add onclick as backup method
-            confirmBtn.onclick = (e) => {
-                console.log('Confirm button onclick!');
+            // Also add mousedown as backup
+            newConfirmBtn.addEventListener('mousedown', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                this.handleConfirm();
-            };
-        } else {
-            console.log('Confirm button NOT found!');
+            });
         }
         
         if (cancelBtn) {
-            cancelBtn.addEventListener('click', (e) => {
-                console.log('Cancel button clicked!');
+            // Ensure button is clickable
+            cancelBtn.style.cursor = 'pointer';
+            cancelBtn.style.pointerEvents = 'auto';
+            cancelBtn.style.userSelect = 'none';
+            
+            // Remove any existing listeners to prevent duplicates
+            const newCancelBtn = cancelBtn.cloneNode(true);
+            cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn);
+            
+            // Add click listener with proper event handling
+            newCancelBtn.addEventListener('click', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
+                e.stopImmediatePropagation();
                 if (this.cancelCallback) {
                     this.cancelCallback();
                 }
                 this.close();
-            });
+            }, true); // Use capture phase
         }
         
         if (closeBtn) {
-            closeBtn.addEventListener('click', (e) => {
+            // Ensure button is clickable
+            closeBtn.style.cursor = 'pointer';
+            closeBtn.style.pointerEvents = 'auto';
+            closeBtn.style.userSelect = 'none';
+            
+            // Remove any existing listeners to prevent duplicates
+            const newCloseBtn = closeBtn.cloneNode(true);
+            closeBtn.parentNode.replaceChild(newCloseBtn, closeBtn);
+            
+            // Add click listener with proper event handling
+            newCloseBtn.addEventListener('click', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
+                e.stopImmediatePropagation();
                 this.close();
-            });
+            }, true); // Use capture phase
         }
         
         // Add event listeners for prompt modal buttons
@@ -193,29 +200,63 @@ export class ModalManager {
         
         if (promptSubmitBtn) {
             const inputId = promptSubmitBtn.getAttribute('data-input-id');
-            promptSubmitBtn.addEventListener('click', (e) => {
+            
+            // Ensure button is clickable
+            promptSubmitBtn.style.cursor = 'pointer';
+            promptSubmitBtn.style.pointerEvents = 'auto';
+            promptSubmitBtn.style.userSelect = 'none';
+            
+            // Remove any existing listeners to prevent duplicates
+            const newPromptSubmitBtn = promptSubmitBtn.cloneNode(true);
+            promptSubmitBtn.parentNode.replaceChild(newPromptSubmitBtn, promptSubmitBtn);
+            
+            // Add click listener with proper event handling
+            newPromptSubmitBtn.addEventListener('click', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
+                e.stopImmediatePropagation();
                 this.handlePromptSubmit(inputId);
-            });
+            }, true); // Use capture phase
         }
         
         if (promptCancelBtn) {
-            promptCancelBtn.addEventListener('click', (e) => {
+            // Ensure button is clickable
+            promptCancelBtn.style.cursor = 'pointer';
+            promptCancelBtn.style.pointerEvents = 'auto';
+            promptCancelBtn.style.userSelect = 'none';
+            
+            // Remove any existing listeners to prevent duplicates
+            const newPromptCancelBtn = promptCancelBtn.cloneNode(true);
+            promptCancelBtn.parentNode.replaceChild(newPromptCancelBtn, promptCancelBtn);
+            
+            // Add click listener with proper event handling
+            newPromptCancelBtn.addEventListener('click', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
+                e.stopImmediatePropagation();
                 this.close();
-            });
+            }, true); // Use capture phase
         }
         
         // Handle alert button
         const alertBtn = modalElement.querySelector('#modalAlertBtn');
         if (alertBtn) {
-            alertBtn.addEventListener('click', (e) => {
+            // Ensure button is clickable
+            alertBtn.style.cursor = 'pointer';
+            alertBtn.style.pointerEvents = 'auto';
+            alertBtn.style.userSelect = 'none';
+            
+            // Remove any existing listeners to prevent duplicates
+            const newAlertBtn = alertBtn.cloneNode(true);
+            alertBtn.parentNode.replaceChild(newAlertBtn, alertBtn);
+            
+            // Add click listener with proper event handling
+            newAlertBtn.addEventListener('click', (e) => {
                 e.preventDefault();
                 e.stopPropagation();
+                e.stopImmediatePropagation();
                 this.close();
-            });
+            }, true); // Use capture phase
         }
         
         // Fade in effect

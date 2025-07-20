@@ -119,8 +119,15 @@ class Game {
             
             const target = event.target;
             
-            // Don't interfere with modal elements at all
-            if (target.closest('.modal-content') || target.closest('.modal-overlay') || target.closest('.modal-close')) {
+            // Don't interfere with modal elements at all - let them handle their own events
+            if (target.closest('.modal-content') || target.closest('.modal-overlay') || target.closest('.modal-close') || 
+                target.closest('#modalConfirmBtn') || target.closest('#modalCancelBtn') || target.closest('#modalPromptSubmitBtn') || 
+                target.closest('#modalPromptCancelBtn')) {
+                return;
+            }
+            
+            // Don't interfere with any modal-related elements
+            if (target.closest('[id^="modal"]')) {
                 return;
             }
             
