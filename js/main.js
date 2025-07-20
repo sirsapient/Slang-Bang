@@ -119,14 +119,17 @@ class Game {
             
             const target = event.target;
             
-            // Handle app-icon clicks
+            // Don't interfere with modal elements
+            if (target.closest('.modal-content') || target.closest('.modal-overlay')) {
+                return;
+            }
+            
+            // Handle app-icon clicks (but not modal buttons)
             if (target.closest('.app-icon')) {
                 const appIcon = target.closest('.app-icon');
                 const onclick = appIcon.getAttribute('onclick');
                 if (onclick) {
-                    // Remove the onclick attribute to prevent double execution
-                    appIcon.removeAttribute('onclick');
-                    // Execute the onclick code
+                    // Execute the onclick code without removing the attribute
                     try {
                         eval(onclick);
                     } catch (error) {
@@ -135,12 +138,11 @@ class Game {
                 }
             }
             
-            // Handle action-btn clicks
-            if (target.closest('.action-btn')) {
+            // Handle action-btn clicks (but not modal buttons)
+            if (target.closest('.action-btn') && !target.closest('.modal-content')) {
                 const actionBtn = target.closest('.action-btn');
                 const onclick = actionBtn.getAttribute('onclick');
                 if (onclick) {
-                    actionBtn.removeAttribute('onclick');
                     try {
                         eval(onclick);
                     } catch (error) {

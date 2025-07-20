@@ -62,7 +62,8 @@ export class ModalManager {
             // Wait for close animation
             setTimeout(() => this._showModal(modal), 350);
         } else {
-            this._showModal(modal);
+            // Add a small delay to ensure DOM is ready
+            setTimeout(() => this._showModal(modal), 50);
         }
     }
     
@@ -82,10 +83,15 @@ export class ModalManager {
             </div>
         `;
         
-        // Handle click outside
+        // Handle click outside with a small delay to prevent immediate closing
         modalElement.addEventListener('click', (e) => {
             if (e.target === modalElement) {
-                this.close();
+                // Add a small delay to prevent accidental closing
+                setTimeout(() => {
+                    if (this.activeModal === modal) {
+                        this.close();
+                    }
+                }, 100);
             }
         });
         
@@ -186,7 +192,17 @@ export class ModalManager {
             });
         }
         
-                // Fade in effect
+        // Handle alert button
+        const alertBtn = modalElement.querySelector('#modalAlertBtn');
+        if (alertBtn) {
+            alertBtn.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                this.close();
+            });
+        }
+        
+        // Fade in effect
         setTimeout(() => {
             modalElement.style.opacity = '1';
         }, 10);
@@ -232,17 +248,14 @@ export class ModalManager {
         const content = `
             <div style="text-align: center; padding: 20px;">
                 <p style="margin-bottom: 20px;">${message}</p>
-                <button id="modalConfirmBtn" class="action-btn" style="margin: 0 10px; cursor: pointer;" onclick="console.log('Confirm button clicked via onclick!'); game.ui.modals.handleConfirm();">Confirm</button>
-                <button id="modalCancelBtn" class="action-btn" style="margin: 0 10px; background: #ff6666; cursor: pointer;" onclick="console.log('Cancel button clicked via onclick!'); game.ui.modals.close();">Cancel</button>
+                <button id="modalConfirmBtn" class="action-btn" style="margin: 0 10px; cursor: pointer;">Confirm</button>
+                <button id="modalCancelBtn" class="action-btn" style="margin: 0 10px; background: #ff6666; cursor: pointer;">Cancel</button>
             </div>
         `;
         
-        // Create and show modal directly without using modal.show()
-        this._showModal({
-            title: 'Confirm Action',
-            content: content,
-            options: { maxWidth: '500px' }
-        });
+        // Create and show modal using the proper show method
+        const modal = this.create('Confirm Action', content, { maxWidth: '500px' });
+        modal.show();
     }
     
     handleConfirm() {
@@ -260,7 +273,7 @@ export class ModalManager {
         const content = `
             <div style="text-align: center; padding: 20px;">
                 <p style="margin-bottom: 20px;">${message}</p>
-                <button onclick="game.ui.modals.close()" class="action-btn">OK</button>
+                <button id="modalAlertBtn" class="action-btn">OK</button>
             </div>
         `;
         
