@@ -119,8 +119,8 @@ class Game {
             
             const target = event.target;
             
-            // Don't interfere with modal elements
-            if (target.closest('.modal-content') || target.closest('.modal-overlay')) {
+            // Don't interfere with modal elements at all
+            if (target.closest('.modal-content') || target.closest('.modal-overlay') || target.closest('.modal-close')) {
                 return;
             }
             

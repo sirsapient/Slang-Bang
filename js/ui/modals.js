@@ -8,6 +8,8 @@ export class ModalManager {
         this.confirmCallback = null;
         this.cancelCallback = null;
         this.promptCallback = null;
+        this.isShowing = false;
+        this.isClosing = false;
         // Notification queue
         this.notificationQueue = [];
         this.notificationActive = false;
@@ -48,6 +50,14 @@ export class ModalManager {
     }
     
     show(modal) {
+        // Prevent multiple rapid show calls
+        if (this.isShowing) {
+            console.log('Modal already showing, ignoring duplicate call');
+            return;
+        }
+        
+        this.isShowing = true;
+        
         // Always re-append the container if it was removed
         if (!this.modalOverlayContainer.parentNode) {
             this.container.appendChild(this.modalOverlayContainer);
@@ -60,10 +70,16 @@ export class ModalManager {
         if (this.activeModal) {
             this.close();
             // Wait for close animation
-            setTimeout(() => this._showModal(modal), 350);
+            setTimeout(() => {
+                this._showModal(modal);
+                this.isShowing = false;
+            }, 350);
         } else {
             // Add a small delay to ensure DOM is ready
-            setTimeout(() => this._showModal(modal), 50);
+            setTimeout(() => {
+                this._showModal(modal);
+                this.isShowing = false;
+            }, 50);
         }
     }
     
@@ -211,6 +227,15 @@ export class ModalManager {
     close() {
         console.log('close() called on instance', this._instanceId, 'activeModal:', this.activeModal);
         console.trace(); // Print the call stack for debugging
+        
+        // Prevent rapid closing
+        if (this.isClosing) {
+            console.log('Modal already closing, ignoring duplicate call');
+            return;
+        }
+        
+        this.isClosing = true;
+        
         if (this.activeModal && this.activeModal.element) {
             const element = this.activeModal.element;
             // Fade out effect
@@ -230,6 +255,7 @@ export class ModalManager {
                     }
                 }
                 console.log('Modal removed and overlay hidden');
+                this.isClosing = false;
             }, 300);
         } else {
             console.log('close() called but no active modal to remove');
@@ -237,6 +263,7 @@ export class ModalManager {
             this.confirmCallback = null;
             this.cancelCallback = null;
             this.promptCallback = null;
+            this.isClosing = false;
         }
     }
     
@@ -255,7 +282,11 @@ export class ModalManager {
         
         // Create and show modal using the proper show method
         const modal = this.create('Confirm Action', content, { maxWidth: '500px' });
-        modal.show();
+        
+        // Add a small delay to prevent rapid modal creation
+        setTimeout(() => {
+            modal.show();
+        }, 100);
     }
     
     handleConfirm() {
